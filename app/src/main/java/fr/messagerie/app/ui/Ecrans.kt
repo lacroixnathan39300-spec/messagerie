@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.sp
 import fr.messagerie.app.reseau.Appareil
 import fr.messagerie.app.reseau.Message
 import fr.messagerie.app.reseau.Reseau
+import kotlin.random.Random
+import kotlinx.coroutines.delay
 
 private val couleursContacts = listOf(Accent, Color(0xFF7AA7FF), Ephemere, Color(0xFFC594FF), Color(0xFFFF8FA3))
 
@@ -380,6 +382,20 @@ private val LEURRE = listOf(
     Message("", "Moi", "Merci, à ce soir.", moi = true),
 )
 
+// Réponses automatiques de la fausse conversation, pour qu'elle paraisse vivante.
+private val REPONSES_LEURRE = listOf(
+    "Ok 👍",
+    "D'accord.",
+    "Ça marche.",
+    "Je te redis ça tout à l'heure.",
+    "Oui pas de souci.",
+    "Je suis occupé là, je te rappelle.",
+    "Haha",
+    "Tu rentres à quelle heure ?",
+    "Merci !",
+    "On en parle ce soir.",
+)
+
 @Composable
 private fun Conversation(nom: String, onRetour: () -> Unit, onReglages: () -> Unit) {
     var saisie by remember { mutableStateOf("") }
@@ -393,6 +409,16 @@ private fun Conversation(nom: String, onRetour: () -> Unit, onReglages: () -> Un
 
     LaunchedEffect(fil.size, mode) {
         if (mode != "verrouillee" && fil.isNotEmpty()) etatListe.animateScrollToItem(fil.size - 1)
+    }
+
+    // Fausse conversation : une réponse arrive après un délai différent à chaque fois (3 à 25 s).
+    // Si un nouveau message part entre-temps, l'attente repart de zéro.
+    LaunchedEffect(filLeurre.size, mode) {
+        if (mode == "leurre" && filLeurre.size > LEURRE.size && filLeurre.last().moi) {
+            delay(Random.nextLong(3_000, 25_000))
+            val derniere = filLeurre.lastOrNull { !it.moi }?.texte
+            filLeurre.add(Message("", "Moi", REPONSES_LEURRE.filter { it != derniere }.random(), moi = false))
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(Fond).statusBarsPadding().navigationBarsPadding().imePadding()) {
