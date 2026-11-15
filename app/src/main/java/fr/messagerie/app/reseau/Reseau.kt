@@ -275,13 +275,17 @@ object Reseau {
             .put("jeton", jetonMoi)
         Thread {
             val reponse = Relais.requete("POST", "/v1/inscrire", corps)
+            val code = Relais.dernierCode
             principal.post {
                 if (reponse != null) {
                     monPseudo.value = propre
                     prefs?.edit()?.putString("pseudo", propre)?.apply()
                     statutPseudo.value = "Pseudo enregistré : $propre"
-                } else {
+                } else if (code == 400 || code == 409) {
                     statutPseudo.value = "Pseudo invalide ou déjà pris (3 à 20 lettres, chiffres, _ . -)"
+                } else {
+                    // Le relais ne répond pas : ce n'est pas la faute du pseudo.
+                    statutPseudo.value = "Relais internet injoignable : pseudo non enregistré. Vérifie ta connexion et réessaie plus tard."
                 }
             }
         }.start()
