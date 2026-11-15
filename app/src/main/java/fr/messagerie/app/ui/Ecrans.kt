@@ -1,6 +1,11 @@
 package fr.messagerie.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -395,129 +400,169 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
 
 @Composable
 private fun Reglages(onRetour: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().background(Fond).statusBarsPadding().padding(20.dp)) {
+    var pseudoSaisi by remember { mutableStateOf(Reseau.monPseudo.value) }
+    var numeroSaisi by remember { mutableStateOf(Reseau.monNumero.value) }
+    var codeNouveau by remember { mutableStateOf("") }
+    var leurreNouveau by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Fond)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("←", color = Texte, fontSize = 22.sp, modifier = Modifier.clickable(onClick = onRetour))
+            Text("Réglages", color = Texte, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        }
+
+        SectionReglage("Profil") {
+            ChampReglage(pseudoSaisi, { pseudoSaisi = it }, "Pseudo, ex. camille_42")
+            Aide("Visible par les autres. Ton numéro n'est jamais partagé avec le relais.")
+            BoutonReglage("Enregistrer le pseudo", Accent, Fond) { Reseau.inscrirePseudo(pseudoSaisi) }
+            if (Reseau.statutPseudo.value.isNotBlank()) Aide(Reseau.statutPseudo.value)
+        }
+
+        SectionReglage("Sécurité") {
+            ChampReglage(codeNouveau, { codeNouveau = it.filter { c -> c.isDigit() }.take(8) }, "Code d'accès (4 à 8 chiffres)", chiffres = true)
+            BoutonReglage(if (Reseau.codeDefini()) "Changer le code" else "Définir le code", Accent, Fond) {
+                if (codeNouveau.length >= 4) {
+                    Reseau.definirCode(codeNouveau)
+                    codeNouveau = ""
+                }
+            }
+            Aide("Demandé à chaque ouverture d'une conversation. Les messages restent masqués sans lui.")
+            LigneSeparation()
+            ChampReglage(leurreNouveau, { leurreNouveau = it.filter { c -> c.isDigit() }.take(8) }, "Code leurre (4 à 8 chiffres)", chiffres = true)
+            BoutonReglage(if (Reseau.leurreDefini()) "Changer le leurre" else "Définir le leurre", Ephemere, Fond) {
+                if (leurreNouveau.length >= 4) {
+                    Reseau.definirLeurre(leurreNouveau)
+                    leurreNouveau = ""
+                }
+            }
+            Aide("Ouvre une fausse conversation. Utilise-le si quelqu'un te force à ouvrir l'appli. Il doit être différent du code.")
+        }
+
+        SectionReglage("Connexion") {
+            LigneInfo("Wi-Fi local", "Actif", "non chiffré", Ephemere)
+            LigneInfo("SMS (sans internet)", "Actif", "chiffré", Accent)
+            LigneInfo("Relais internet", "Ouvert seulement", "pseudo requis", TexteDoux)
+        }
+
+        SectionReglage("Numéro") {
+            ChampReglage(numeroSaisi, { numeroSaisi = it }, "Ton numéro, ex. 06 00 00 00 00", telephone = true)
+            BoutonReglage("Enregistrer le numéro", Accent, Fond) { Reseau.enregistrerNumero(numeroSaisi) }
+            Aide("Sert uniquement à l'envoi par SMS et à l'invitation de tes contacts.")
+        }
+
         Text(
-            "← Retour",
-            color = Accent,
-            fontSize = 14.sp,
-            modifier = Modifier.clickable(onClick = onRetour).padding(bottom = 12.dp),
+            "Messagerie · version de test",
+            color = TexteDoux,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(bottom = 24.dp),
         )
-        Text("Réglages", color = Texte, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(20.dp))
-        Text("Code d'accès aux conversations (demandé à chaque ouverture)", color = TexteDoux, fontSize = 13.sp)
-        Spacer(Modifier.height(6.dp))
-        var codeNouveau by remember { mutableStateOf("") }
-        TextField(
-            value = codeNouveau,
-            onValueChange = { codeNouveau = it.filter { c -> c.isDigit() }.take(8) },
-            placeholder = { Text("4 à 8 chiffres", color = TexteDoux) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Surface,
-                unfocusedContainerColor = Surface,
-                focusedTextColor = Texte,
-                unfocusedTextColor = Texte,
-                cursorColor = Accent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-            ),
-        )
-        Spacer(Modifier.height(6.dp))
-        Puce(if (Reseau.codeDefini()) "Changer le code" else "Définir le code", Accent, modifier = Modifier.clickable {
-            if (codeNouveau.length >= 4) {
-                Reseau.definirCode(codeNouveau)
-                codeNouveau = ""
-            }
-        })
-        Spacer(Modifier.height(12.dp))
-        var leurreNouveau by remember { mutableStateOf("") }
-        Text("Code leurre (ouvre une fausse conversation)", color = TexteDoux, fontSize = 13.sp)
-        Spacer(Modifier.height(6.dp))
-        TextField(
-            value = leurreNouveau,
-            onValueChange = { leurreNouveau = it.filter { c -> c.isDigit() }.take(8) },
-            placeholder = { Text("4 à 8 chiffres, différent du code", color = TexteDoux) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Surface,
-                unfocusedContainerColor = Surface,
-                focusedTextColor = Texte,
-                unfocusedTextColor = Texte,
-                cursorColor = Accent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-            ),
-        )
-        Spacer(Modifier.height(6.dp))
-        Puce(if (Reseau.leurreDefini()) "Changer le leurre" else "Définir le leurre", Ephemere, modifier = Modifier.clickable {
-            if (leurreNouveau.length >= 4) {
-                Reseau.definirLeurre(leurreNouveau)
-                leurreNouveau = ""
-            }
-        })
-        Spacer(Modifier.height(16.dp))
-        Text("Ton pseudo (visible par les autres, sans numéro)", color = TexteDoux, fontSize = 13.sp)
-        Spacer(Modifier.height(6.dp))
-        var pseudoSaisi by remember { mutableStateOf(Reseau.monPseudo.value) }
-        TextField(
-            value = pseudoSaisi,
-            onValueChange = { pseudoSaisi = it },
-            placeholder = { Text("ex. camille_42", color = TexteDoux) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Surface,
-                unfocusedContainerColor = Surface,
-                focusedTextColor = Texte,
-                unfocusedTextColor = Texte,
-                cursorColor = Accent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-            ),
-        )
-        Spacer(Modifier.height(6.dp))
-        Puce("Enregistrer le pseudo", Accent, modifier = Modifier.clickable { Reseau.inscrirePseudo(pseudoSaisi) })
-        Text(Reseau.statutPseudo.value, color = TexteDoux, fontSize = 12.sp)
-        Spacer(Modifier.height(16.dp))
-        Text("Ton numéro (pour le SMS)", color = TexteDoux, fontSize = 13.sp)
-        Spacer(Modifier.height(6.dp))
-        TextField(
-            value = Reseau.monNumero.value,
-            onValueChange = { Reseau.enregistrerNumero(it) },
-            placeholder = { Text("06 00 00 00 00", color = TexteDoux) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Surface,
-                unfocusedContainerColor = Surface,
-                focusedTextColor = Texte,
-                unfocusedTextColor = Texte,
-                cursorColor = Accent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-            ),
-        )
-        Spacer(Modifier.height(20.dp))
-        Ligne("Wi-Fi local", "Activé (non chiffré)", Ephemere)
-        Ligne("SMS (sans internet)", "Activé (chiffré)", Accent)
-        Ligne("Internet direct", "Bientôt", TexteDoux)
-        Ligne("Oignon (3 sauts)", "Bientôt", TexteDoux)
-        Ligne("Serveur de secours", "Bientôt", TexteDoux)
     }
 }
 
 @Composable
-private fun Ligne(libelle: String, valeur: String, couleur: Color) {
+private fun SectionReglage(titre: String, contenu: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            titre.uppercase(),
+            color = TexteDoux,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(start = 4.dp),
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Surface)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            content = contenu,
+        )
+    }
+}
+
+@Composable
+private fun ChampReglage(
+    valeur: String,
+    surChangement: (String) -> Unit,
+    indication: String,
+    chiffres: Boolean = false,
+    telephone: Boolean = false,
+) {
+    TextField(
+        value = valeur,
+        onValueChange = surChangement,
+        placeholder = { Text(indication, color = TexteDoux) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        shape = RoundedCornerShape(12.dp),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = when {
+                chiffres -> KeyboardType.NumberPassword
+                telephone -> KeyboardType.Phone
+                else -> KeyboardType.Text
+            }
+        ),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Fond,
+            unfocusedContainerColor = Fond,
+            focusedTextColor = Texte,
+            unfocusedTextColor = Texte,
+            cursorColor = Accent,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+        ),
+    )
+}
+
+@Composable
+private fun BoutonReglage(texte: String, couleur: Color, couleurTexte: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(couleur)
+            .clickable(onClick = onClick)
+            .padding(vertical = 13.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(texte, color = couleurTexte, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+    }
+}
+
+@Composable
+private fun Aide(texte: String) {
+    Text(texte, color = TexteDoux, fontSize = 12.sp, lineHeight = 17.sp)
+}
+
+@Composable
+private fun LigneSeparation() {
+    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Separateur))
+}
+
+@Composable
+private fun LigneInfo(libelle: String, valeur: String, detail: String, couleur: Color) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 16.dp),
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(libelle, color = Texte, fontSize = 15.sp)
-        Text(valeur, color = couleur, fontSize = 15.sp)
+        Column {
+            Text(libelle, color = Texte, fontSize = 15.sp)
+            Text(detail, color = TexteDoux, fontSize = 12.sp)
+        }
+        Puce(valeur, couleur)
     }
-    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Separateur))
 }
 
 @Composable
