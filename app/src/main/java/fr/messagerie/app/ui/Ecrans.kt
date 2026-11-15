@@ -151,7 +151,7 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
             Text("←", color = Texte, fontSize = 20.sp, modifier = Modifier.clickable(onClick = onRetour))
             Column(modifier = Modifier.weight(1f)) {
                 Text(nom, color = Texte, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                Text("Wi-Fi local · non chiffré pour l'instant", color = TexteDoux, fontSize = 12.sp)
+                Text("Wi-Fi : non chiffré · SMS : chiffré", color = TexteDoux, fontSize = 12.sp)
             }
         }
         LazyColumn(
@@ -210,9 +210,27 @@ private fun Reglages(onRetour: () -> Unit) {
         )
         Text("Réglages", color = Texte, fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(20.dp))
-        Text("Nom affiché sur le réseau local : ${Reseau.monNom}", color = TexteDoux, fontSize = 13.sp)
+        Text("Ton numéro (pour le SMS)", color = TexteDoux, fontSize = 13.sp)
+        Spacer(Modifier.height(6.dp))
+        TextField(
+            value = Reseau.monNumero.value,
+            onValueChange = { Reseau.enregistrerNumero(it) },
+            placeholder = { Text("06 00 00 00 00", color = TexteDoux) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Surface,
+                unfocusedContainerColor = Surface,
+                focusedTextColor = Texte,
+                unfocusedTextColor = Texte,
+                cursorColor = Accent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+            ),
+        )
         Spacer(Modifier.height(20.dp))
-        Ligne("Local (proximité)", "Activé", Accent)
+        Ligne("Wi-Fi local", "Activé (non chiffré)", Ephemere)
+        Ligne("SMS (sans internet)", "Activé (chiffré)", Accent)
         Ligne("Internet direct", "Bientôt", TexteDoux)
         Ligne("Oignon (3 sauts)", "Bientôt", TexteDoux)
         Ligne("Serveur de secours", "Bientôt", TexteDoux)
