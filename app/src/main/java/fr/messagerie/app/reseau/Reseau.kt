@@ -29,6 +29,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.URLEncoder
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -49,6 +50,8 @@ data class Appareil(
     val cle: String?,
     // Un contact inconnu qui écrit reste en « demande » tant qu'on ne l'a pas accepté.
     val accepte: Boolean = true,
+    // Boîte du relais internet, quand le contact a été trouvé par pseudo (mode « à distance »).
+    val boite: String? = null,
 )
 
 data class Message(
@@ -97,6 +100,13 @@ object Reseau {
 
     var monNumero = mutableStateOf("")
         private set
+
+    // Pseudo public : sert à se trouver à distance par internet, sans donner son numéro.
+    var monPseudo = mutableStateOf("")
+        private set
+
+    // Message affiché sous le champ pseudo, dans les réglages.
+    val statutPseudo = mutableStateOf("")
 
     private var premierPlan = false
 
@@ -148,6 +158,11 @@ object Reseau {
     private var decouverte: NsdManager.DiscoveryListener? = null
     private var initialise = false
     private var ticLance = false
+    private var releveLancee = false
+
+    // Boîte (adresse de réception sur le relais) et jeton secret pour la relever. Créés une fois.
+    private var boiteMoi: String? = null
+    private var jetonMoi: String? = null
 
     // Efface les messages éphémères arrivés à échéance, toutes les 5 secondes.
     private val tic = object : Runnable {
@@ -186,6 +201,9 @@ object Reseau {
         val p = contexte.getSharedPreferences("reseau", Context.MODE_PRIVATE)
         prefs = p
         monNumero.value = p.getString("numero", "") ?: ""
+        monPseudo.value = p.getString("pseudo", "") ?: ""
+        boiteMoi = p.getString("boite", null) ?: Relais.aleatoire(16).also { p.edit().putString("boite", it).apply() }
+        jetonMoi = p.getString("jeton", null) ?: Relais.aleatoire(32).also { p.edit().putString("jeton", it).apply() }
         // Nom fixe sur le Wi-Fi local : sinon chaque lancement créerait un nouveau contact chez les autres.
         monNom = p.getString("nom", null)
             ?: "${Build.MODEL} ${(1000..9999).random()}".also { p.edit().putString("nom", it).apply() }
@@ -208,6 +226,17 @@ object Reseau {
         if (!ticLance) {
             ticLance = true
             principal.postDelayed(tic, 5000)
+        }
+        if (!releveLancee) {
+            releveLancee = true
+            Thread {
+                while (true) {
+                    try {
+                        if (premierPlan && monPseudo.value.isNotBlank()) recevoirRelais()
+                    } catch (e: Exception) { }
+                    try { Thread.sleep(20000) } catch (e: Exception) { }
+                }
+            }.start()
         }
 
         // Wi-Fi local : si la découverte échoue, le reste de l'appli (SMS) continue de marcher.
@@ -255,6 +284,7 @@ object Reseau {
                                         numero = connu?.numero,
                                         cle = connu?.cle,
                                         accepte = connu?.accepte ?: true,
+                                        boite = connu?.boite,
                                     )
                                 }
                             }
@@ -366,7 +396,25 @@ object Reseau {
         val id = a.nom
         val cle = a.cle
         val numero = a.numero
+        val boiteDest = a.boite
         when {
+            // Contact trouvé par pseudo : le message passe par le relais internet, chiffré de bout en bout.
+            boiteDest != null && cle != null -> {
+                val clair = JSONObject().put("pseudo", monPseudo.value).put("texte", m.texte).put("ttl", duree).toString()
+                val enveloppe = JSONObject()
+                    .put("cle", Chiffrement.clePublique(contexte))
+                    .put("boite", boiteMoi)
+                    .put("c", Chiffrement.chiffrer(contexte, cle, clair))
+                val corps = JSONObject().put("boite", boiteDest).put("charge", enveloppe.toString())
+                Thread {
+                    if (Relais.requete("POST", "/v1/envoyer", corps) != null) {
+                        majStatut(m.id, Statut.ENVOYE)
+                    } else {
+                        majStatut(m.id, Statut.ECHEC)
+                        principal.post { note(id, "Non remis : le relais internet est injoignable. Réessaie quand tu as du réseau.") }
+                    }
+                }.start()
+            }
             numero != null && cle != null -> {
                 val clair = JSONObject().put("de", monNumero.value).put("texte", m.texte).put("ttl", duree).toString()
                 if (!Sms.envoyer(contexte, numero, Chiffrement.chiffrer(contexte, cle, clair), m.id)) {
@@ -423,6 +471,105 @@ object Reseau {
             majStatut(m.id, Statut.ENVOI)
             val reste = if (m.expire > 0) ((m.expire - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(1) else 0
             acheminer(a, m, contexte, reste)
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Relais internet (pseudo) — « mode à distance »
+    // ------------------------------------------------------------------------------------------
+
+    fun inscrirePseudo(pseudo: String) {
+        val contexte = appContext ?: return
+        val propre = pseudo.trim().lowercase()
+        if (propre.length < 3) {
+            statutPseudo.value = "Pseudo trop court (3 à 20 lettres, chiffres, _ . -)"
+            return
+        }
+        statutPseudo.value = "Enregistrement…"
+        val corps = JSONObject()
+            .put("pseudo", propre)
+            .put("cle", Chiffrement.clePublique(contexte))
+            .put("boite", boiteMoi)
+            .put("jeton", jetonMoi)
+        Thread {
+            val (reponse, code) = Relais.requeteAvecCode("POST", "/v1/inscrire", corps)
+            principal.post {
+                if (reponse != null) {
+                    monPseudo.value = propre
+                    prefs?.edit()?.putString("pseudo", propre)?.apply()
+                    statutPseudo.value = "Pseudo enregistré : $propre"
+                } else if (code == 400 || code == 409) {
+                    statutPseudo.value = "Pseudo invalide ou déjà pris (3 à 20 lettres, chiffres, _ . -)"
+                } else {
+                    statutPseudo.value = "Relais internet injoignable : pseudo non enregistré. Vérifie ta connexion et réessaie."
+                }
+            }
+        }.start()
+    }
+
+    fun ouvrirPseudo(pseudo: String, onResultat: (String?) -> Unit) {
+        val propre = pseudo.trim().lowercase()
+        val existant = appareils[propre]
+        if (existant != null && existant.accepte && existant.boite != null) {
+            onResultat(propre)
+            return
+        }
+        Thread {
+            val reponse = try {
+                Relais.requete("GET", "/v1/chercher?pseudo=" + URLEncoder.encode(propre, "UTF-8"))
+            } catch (e: Exception) {
+                null
+            }
+            principal.post {
+                val cle = reponse?.optString("cle", "").orEmpty()
+                val boite = reponse?.optString("boite", "").orEmpty()
+                if (cle.isEmpty() || boite.isEmpty()) {
+                    onResultat(null)
+                } else {
+                    val connu = appareils[propre]
+                    appareils[propre] = Appareil(propre, connu?.adresse, connu?.port ?: 0, connu?.numero, cle, accepte = true, boite = boite)
+                    sauverContacts()
+                    onResultat(propre)
+                }
+            }
+        }.start()
+    }
+
+    private fun recevoirRelais() {
+        val contexte = appContext ?: return
+        val boite = boiteMoi ?: return
+        val jeton = jetonMoi ?: return
+        val reponse = Relais.requete("GET", "/v1/recevoir?boite=$boite&jeton=$jeton") ?: return
+        val liste = reponse.optJSONArray("messages") ?: return
+        for (i in 0 until liste.length()) {
+            try {
+                val enveloppe = JSONObject(liste.getString(i))
+                val cleAutre = enveloppe.getString("cle")
+                val boiteAutre = enveloppe.getString("boite")
+                val clair = Chiffrement.dechiffrer(contexte, cleAutre, enveloppe.getString("c")) ?: continue
+                val json = JSONObject(clair)
+                val pseudo = json.getString("pseudo")
+                val texte = json.getString("texte")
+                val duree = json.optInt("ttl", 0)
+                principal.post {
+                    val connu = appareils[pseudo]
+                    val cleChangee = connu?.cle != null && connu.cle != cleAutre
+                    appareils[pseudo] = Appareil(
+                        nom = pseudo,
+                        adresse = connu?.adresse,
+                        port = connu?.port ?: 0,
+                        numero = connu?.numero,
+                        cle = cleAutre,
+                        accepte = connu?.accepte ?: false,
+                        boite = boiteAutre,
+                    )
+                    sauverContacts()
+                    if (cleChangee) note(pseudo, "La clé de ce contact a changé. Compare à nouveau le code de sécurité de vive voix.")
+                    ajouter(Message(pseudo, pseudo, texte, moi = false, expire = echeance(duree)))
+                    notifier()
+                }
+            } catch (e: Exception) {
+            }
         }
     }
 
@@ -875,7 +1022,7 @@ object Reseau {
                 Sms.envoyerTexte(expediteur, Sms.PREFIXE_P3 + confirmation)
                 val existant = appareils.values.firstOrNull { memeNumero(it.numero, cleCode) }
                 val nom = existant?.nom ?: cleCode
-                appareils[nom] = Appareil(nom, existant?.adresse, existant?.port ?: 0, existant?.numero ?: cleCode, morceaux[0], accepte = true)
+                appareils[nom] = Appareil(nom, existant?.adresse, existant?.port ?: 0, existant?.numero ?: cleCode, morceaux[0], accepte = true, boite = existant?.boite)
                 sauverContacts()
                 statutLiaison.value = "Liaison faite. Vous pouvez vous écrire."
                 envoyerEnAttente(nom)
@@ -892,7 +1039,7 @@ object Reseau {
             if (Appairage.verifierConfirmation(k, pubA, pubB, etiquetteA)) {
                 val existant = appareils.values.firstOrNull { memeNumero(it.numero, cleEntree) }
                 val nom = existant?.nom ?: cleEntree
-                appareils[nom] = Appareil(nom, existant?.adresse, existant?.port ?: 0, existant?.numero ?: cleEntree, pubA, accepte = true)
+                appareils[nom] = Appareil(nom, existant?.adresse, existant?.port ?: 0, existant?.numero ?: cleEntree, pubA, accepte = true, boite = existant?.boite)
                 sauverContacts()
                 statutLiaison.value = "Liaison confirmée des deux côtés. Vous pouvez vous écrire."
                 envoyerEnAttente(nom)
@@ -1005,7 +1152,7 @@ object Reseau {
         if (existant?.cle == cle) return
         val nom = existant?.nom ?: expediteur
         surPrincipal {
-            appareils[nom] = Appareil(nom, existant?.adresse, existant?.port ?: 0, existant?.numero ?: expediteur, cle, accepte = existant?.accepte ?: false)
+            appareils[nom] = Appareil(nom, existant?.adresse, existant?.port ?: 0, existant?.numero ?: expediteur, cle, accepte = existant?.accepte ?: false, boite = existant?.boite)
             sauverContacts()
             if (existant?.cle != null) {
                 note(nom, "La clé de ce contact a changé. Compare à nouveau le code de sécurité de vive voix.")
@@ -1188,6 +1335,7 @@ object Reseau {
                         numero = connu?.numero ?: numero,
                         cle = connu?.cle ?: cle,
                         accepte = connu?.accepte ?: false,
+                        boite = connu?.boite,
                     )
                     sauverContacts()
                     if (cleDifferente) note(de, "Attention : le message suivant vient d'un appareil dont la clé ne correspond pas à celle enregistrée.")
@@ -1217,6 +1365,7 @@ object Reseau {
                     o.optString("numero").ifBlank { null },
                     o.optString("cle").ifBlank { null },
                     accepte = o.optBoolean("accepte", true),
+                    boite = o.optString("boite").ifBlank { null },
                 )
             }
         } catch (e: Exception) {
@@ -1229,7 +1378,7 @@ object Reseau {
         appareils.values.filter { it.cle != null || it.numero != null }.forEach {
             liste.put(
                 JSONObject().put("nom", it.nom).put("numero", it.numero ?: "").put("cle", it.cle ?: "")
-                    .put("accepte", it.accepte)
+                    .put("accepte", it.accepte).put("boite", it.boite ?: "")
             )
         }
         prefs?.edit()?.putString("contacts", liste.toString())?.apply()

@@ -259,15 +259,31 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
     var saisie by remember { mutableStateOf("") }
     var erreur by remember { mutableStateOf(false) }
 
+    var recherche by remember { mutableStateOf(false) }
     fun ouvrirSaisie() {
         val propre = saisie.trim()
         if (propre.isEmpty()) return
-        val ouvert = Reseau.ouvrirNumero(propre)
-        if (ouvert != null) {
-            saisie = ""
-            onOuvrir(ouvert)
+        // Des lettres → recherche d'un pseudo sur le relais internet ; sinon, un numéro.
+        if (propre.any { it.isLetter() }) {
+            recherche = true
+            erreur = false
+            Reseau.ouvrirPseudo(propre) { trouve ->
+                recherche = false
+                if (trouve != null) {
+                    saisie = ""
+                    onOuvrir(trouve)
+                } else {
+                    erreur = true
+                }
+            }
         } else {
-            erreur = true
+            val ouvert = Reseau.ouvrirNumero(propre)
+            if (ouvert != null) {
+                saisie = ""
+                onOuvrir(ouvert)
+            } else {
+                erreur = true
+            }
         }
     }
 
@@ -306,10 +322,9 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
                     Champ(
                         valeur = saisie,
                         surChangement = { saisie = it; erreur = false },
-                        indication = "Numéro de téléphone",
+                        indication = "Pseudo ou numéro",
                         modifier = Modifier.weight(1f),
                         fond = Color.Transparent,
-                        clavier = KeyboardType.Phone,
                     )
                     Box(
                         modifier = Modifier
@@ -322,10 +337,10 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
                         Icone("suivant", if (saisie.isBlank()) TexteDoux else Fond, 20.dp)
                     }
                 }
-                if (erreur) {
+                if (erreur || recherche) {
                     Text(
-                        "Numéro invalide.",
-                        color = Danger,
+                        if (recherche) "Recherche…" else "Introuvable. Vérifie le pseudo ou le numéro.",
+                        color = if (recherche) TexteDoux else Danger,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(horizontal = 24.dp),
                     )
@@ -753,17 +768,19 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 // En ligne : le contact a l'appli ouverte sur le même Wi-Fi. Sinon, les messages partent par SMS.
-                val enLigne = contact?.adresse != null
+                val enWifi = contact?.adresse != null
+                val parInternet = contact?.boite != null
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(if (enLigne) Accent else TexteDoux.copy(alpha = 0.5f)))
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(if (enWifi || parInternet) Accent else TexteDoux.copy(alpha = 0.5f)))
                     Text(
                         when {
-                            contact?.cle == null && enLigne -> "En ligne · clé pas encore échangée"
+                            contact?.cle == null && enWifi -> "En ligne · clé pas encore échangée"
                             contact?.cle == null -> "Clé pas encore échangée"
-                            enLigne -> "En ligne · chiffré"
-                            else -> "Hors ligne · chiffré, par SMS"
+                            enWifi -> "En ligne · chiffré, Wi-Fi"
+                            parInternet -> "Chiffré · par internet"
+                            else -> "Chiffré · par SMS"
                         },
-                        color = if (contact?.cle == null) Ephemere else if (enLigne) Accent else TexteDoux,
+                        color = if (contact?.cle == null) Ephemere else if (enWifi) Accent else TexteDoux,
                         fontSize = 12.sp,
                         maxLines = 1,
                     )
@@ -1272,6 +1289,7 @@ private fun Visionneuse(m: Message, onFermer: () -> Unit) {
 @Composable
 private fun Reglages(onRetour: () -> Unit) {
     var numeroSaisi by remember { mutableStateOf(Reseau.monNumero.value) }
+    var pseudoSaisi by remember { mutableStateOf(Reseau.monPseudo.value) }
     var codeNouveau by remember { mutableStateOf("") }
     var leurreNouveau by remember { mutableStateOf("") }
     var codeActuel by remember { mutableStateOf("") }
@@ -1319,16 +1337,35 @@ private fun Reglages(onRetour: () -> Unit) {
                     contentAlignment = Alignment.Center,
                 ) { Icone("cadenas", Accent, 28.dp) }
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    val pseudo = Reseau.monPseudo.value
                     Text(
-                        Reseau.monNumero.value.ifBlank { "Numéro non renseigné" },
+                        pseudo.ifBlank { Reseau.monNumero.value.ifBlank { "À configurer" } },
                         color = Texte,
                         fontSize = 19.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text("Aucun passage par internet", color = TexteDoux, fontSize = 14.sp)
+                    Text(
+                        if (pseudo.isBlank()) "Pas de pseudo" else Reseau.monNumero.value.ifBlank { "Pseudo : $pseudo" },
+                        color = TexteDoux,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                    )
                 }
+            }
+
+            SectionReglage("Pseudo (mode à distance)", "bulle") {
+                Champ(pseudoSaisi, { pseudoSaisi = it }, "Choisis un pseudo, ex. nath39", Modifier.fillMaxWidth(), fond = Fond)
+                Bouton(
+                    if (Reseau.monPseudo.value.isBlank()) "Activer le mode à distance" else "Changer de pseudo",
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Reseau.inscrirePseudo(pseudoSaisi) }
+                if (Reseau.statutPseudo.value.isNotBlank()) {
+                    val ok = Reseau.statutPseudo.value.startsWith("Pseudo enregistré")
+                    Aide(Reseau.statutPseudo.value, if (ok) Accent else Ephemere)
+                }
+                Aide("Avec un pseudo, tes contacts te trouvent et t'écrivent par internet, où qu'ils soient, sans connaître ton numéro. Les messages restent chiffrés : même le relais ne peut pas les lire.")
             }
 
             SectionReglage("Code d'accès", "cadenas") {
@@ -1452,6 +1489,13 @@ private fun Reglages(onRetour: () -> Unit) {
             }
 
             SectionReglage("Connexions", "reglages") {
+                LigneEtat(
+                    "Internet (pseudo)",
+                    if (Reseau.monPseudo.value.isBlank()) "Inactif" else "Chiffré",
+                    if (Reseau.monPseudo.value.isBlank()) TexteDoux else Accent,
+                    "Messages à distance. Active-le en choisissant un pseudo ci-dessus",
+                )
+                Box(Modifier.fillMaxWidth().height(1.dp).background(Separateur))
                 LigneEtat("SMS", "Chiffré", Accent, "Fonctionne sans internet")
                 Box(Modifier.fillMaxWidth().height(1.dp).background(Separateur))
                 LigneEtat("MMS", "Chiffré", Accent, "Photos à distance, avec les données mobiles")
