@@ -42,10 +42,12 @@ Le client essaie 1, puis 2, puis 3, puis 4. Le choix est invisible pour l'utilis
 - Vue unique pour photos et vidéos. Capture d'écran bloquée via `FLAG_SECURE` (non garanti contre une photo de l'écran).
 
 ## 6. Identité
-- Pas de numéro de téléphone.
-- Identifiants de destinataire **tournants** pour que les relais ne puissent pas les relier entre eux.
-- Clé publique partagée par QR code ou lien.
-- **Option : numéro de téléphone.** Sert seulement à retrouver ses contacts. Le numéro n'est jamais affiché ni stocké en clair : on compare des empreintes chiffrées. Désactivé par défaut.
+- **Identité par numéro de téléphone**, vérifié par SMS à l'inscription.
+- Le numéro sert à retrouver ses contacts. Seules des empreintes chiffrées sont comparées, la liste de contacts n'est jamais envoyée en clair.
+- Le message est chiffré de bout en bout avec les clés de chaque appareil ; le numéro n'ouvre pas le contenu.
+- Limite à connaître : l'opérateur ou le service SMS peut savoir qu'un numéro s'est inscrit. Le numéro reste donc visible pour eux.
+- Identifiants de destinataire tournants pour que les relais ne puissent pas les relier entre eux.
+- Ajout par QR code ou lien possible sans numéro (mode secondaire).
 
 ## 7. Décisions
 - **Messagerie à part, en première application** : elle reste une appli autonome. Un hub regroupant plusieurs applis viendra ensuite.
