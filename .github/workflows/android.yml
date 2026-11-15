@@ -1,4 +1,4 @@
-name: Messagerie : APK de test
+name: "Messagerie : APK de test"
 on:
   push:
     branches: [main]
