@@ -89,7 +89,7 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
             TextField(
                 value = numeroSaisi,
                 onValueChange = { numeroSaisi = it; erreur = false },
-                placeholder = { Text("Écrire à un numéro", color = TexteDoux) },
+                placeholder = { Text("Pseudo ou numéro", color = TexteDoux) },
                 isError = erreur,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(50),
@@ -108,12 +108,24 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
                     .clip(RoundedCornerShape(50))
                     .background(Accent)
                     .clickable {
-                        val ouvert = Reseau.ouvrirNumero(numeroSaisi)
-                        if (ouvert != null) {
-                            numeroSaisi = ""
-                            onOuvrir(ouvert)
+                        val saisie = numeroSaisi.trim()
+                        if (saisie.any { it.isLetter() }) {
+                            Reseau.ouvrirPseudo(saisie) { trouve ->
+                                if (trouve != null) {
+                                    numeroSaisi = ""
+                                    onOuvrir(trouve)
+                                } else {
+                                    erreur = true
+                                }
+                            }
                         } else {
-                            erreur = true
+                            val ouvert = Reseau.ouvrirNumero(saisie)
+                            if (ouvert != null) {
+                                numeroSaisi = ""
+                                onOuvrir(ouvert)
+                            } else {
+                                erreur = true
+                            }
                         }
                     }
                     .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -280,6 +292,29 @@ private fun Reglages(onRetour: () -> Unit) {
         )
         Text("Réglages", color = Texte, fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(20.dp))
+        Text("Ton pseudo (visible par les autres, sans numéro)", color = TexteDoux, fontSize = 13.sp)
+        Spacer(Modifier.height(6.dp))
+        var pseudoSaisi by remember { mutableStateOf(Reseau.monPseudo.value) }
+        TextField(
+            value = pseudoSaisi,
+            onValueChange = { pseudoSaisi = it },
+            placeholder = { Text("ex. camille_42", color = TexteDoux) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Surface,
+                unfocusedContainerColor = Surface,
+                focusedTextColor = Texte,
+                unfocusedTextColor = Texte,
+                cursorColor = Accent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+            ),
+        )
+        Spacer(Modifier.height(6.dp))
+        Puce("Enregistrer le pseudo", Accent, modifier = Modifier.clickable { Reseau.inscrirePseudo(pseudoSaisi) })
+        Text(Reseau.statutPseudo.value, color = TexteDoux, fontSize = 12.sp)
+        Spacer(Modifier.height(16.dp))
         Text("Ton numéro (pour le SMS)", color = TexteDoux, fontSize = 13.sp)
         Spacer(Modifier.height(6.dp))
         TextField(

@@ -35,6 +35,8 @@ data class Appareil(
     val cle: String?,
     // Un contact inconnu qui écrit reste en « demande » tant qu'on ne l'a pas accepté.
     val accepte: Boolean = true,
+    // Boîte du relais internet, quand le contact a été trouvé par pseudo.
+    val boite: String? = null,
 )
 
 data class Message(val avec: String, val de: String, val texte: String, val moi: Boolean)
@@ -53,6 +55,15 @@ object Reseau {
     var monNumero = mutableStateOf("")
         private set
 
+    var monPseudo = mutableStateOf("")
+        private set
+
+    // Message affiché sous le champ pseudo dans les réglages.
+    val statutPseudo = mutableStateOf("")
+
+    private var boiteMoi: String? = null
+    private var jetonMoi: String? = null
+
     private var appContext: Context? = null
     private var prefs: SharedPreferences? = null
     private var serveur: ServerSocket? = null
@@ -68,6 +79,16 @@ object Reseau {
         prefs = p
         monNumero.value = p.getString("numero", "") ?: ""
         chargerContacts(p)
+        monPseudo.value = p.getString("pseudo", "") ?: ""
+        boiteMoi = p.getString("boite", null) ?: Relais.aleatoire(16).also { p.edit().putString("boite", it).apply() }
+        jetonMoi = p.getString("jeton", null) ?: Relais.aleatoire(32).also { p.edit().putString("jeton", it).apply() }
+        // Relève les messages venus par internet, toutes les 15 secondes.
+        Thread {
+            while (true) {
+                try { recevoirRelais() } catch (e: Exception) { }
+                Thread.sleep(15000)
+            }
+        }.start()
 
         val gestionnaire = contexte.getSystemService(Context.NSD_SERVICE) as NsdManager
         nsd = gestionnaire
@@ -173,6 +194,20 @@ object Reseau {
             envoyerTcp(adresse, a.port, contenu)
             return
         }
+        // Contact trouvé par pseudo : le message passe par le relais internet, chiffré.
+        val boiteDest = a.boite
+        val cleDest = a.cle
+        if (boiteDest != null && cleDest != null) {
+            val clair = JSONObject().put("pseudo", monPseudo.value).put("texte", texte).toString()
+            val enveloppe = JSONObject()
+                .put("cle", Chiffrement.clePublique(contexte))
+                .put("boite", boiteMoi)
+                .put("c", Chiffrement.chiffrer(contexte, cleDest, clair))
+            val corps = JSONObject().put("boite", boiteDest).put("charge", enveloppe.toString())
+            Thread { Relais.requete("POST", "/v1/envoyer", corps) }.start()
+            return
+        }
+
         val numero = a.numero
         val cle = a.cle
         if (numero != null && cle != null) {
@@ -212,6 +247,90 @@ object Reseau {
             )?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: numero
         } catch (e: Exception) {
             numero
+        }
+    }
+
+    // Inscription du pseudo sur le relais : le pseudo est lié à la clé et à la boîte, jamais au numéro.
+    fun inscrirePseudo(pseudo: String) {
+        val contexte = appContext ?: return
+        val propre = pseudo.trim().lowercase()
+        val corps = JSONObject()
+            .put("pseudo", propre)
+            .put("cle", Chiffrement.clePublique(contexte))
+            .put("boite", boiteMoi)
+            .put("jeton", jetonMoi)
+        Thread {
+            val reponse = Relais.requete("POST", "/v1/inscrire", corps)
+            principal.post {
+                if (reponse != null) {
+                    monPseudo.value = propre
+                    prefs?.edit()?.putString("pseudo", propre)?.apply()
+                    statutPseudo.value = "Pseudo enregistré : $propre"
+                } else {
+                    statutPseudo.value = "Pseudo invalide ou déjà pris (3 à 20 lettres, chiffres, _ . -)"
+                }
+            }
+        }.start()
+    }
+
+    // Trouve un contact par pseudo sur le relais, puis ouvre la discussion. Renvoie l'identifiant via onResultat.
+    fun ouvrirPseudo(pseudo: String, onResultat: (String?) -> Unit) {
+        val propre = pseudo.trim().lowercase()
+        Thread {
+            val reponse = Relais.requete("GET", "/v1/chercher?pseudo=$propre")
+            principal.post {
+                if (reponse == null) {
+                    onResultat(null)
+                } else {
+                    appareils[propre] = Appareil(
+                        nom = propre,
+                        adresse = null,
+                        port = 0,
+                        numero = null,
+                        cle = reponse.getString("cle"),
+                        accepte = true,
+                        boite = reponse.getString("boite"),
+                    )
+                    sauverContacts()
+                    onResultat(propre)
+                }
+            }
+        }.start()
+    }
+
+    // Relève les messages du relais, les déchiffre, et les range (en demande si contact inconnu).
+    private fun recevoirRelais() {
+        val contexte = appContext ?: return
+        val boite = boiteMoi ?: return
+        val jeton = jetonMoi ?: return
+        val reponse = Relais.requete("GET", "/v1/recevoir?boite=$boite&jeton=$jeton") ?: return
+        val liste = reponse.optJSONArray("messages") ?: return
+        for (i in 0 until liste.length()) {
+            try {
+                val enveloppe = JSONObject(liste.getString(i))
+                val cleAutre = enveloppe.getString("cle")
+                val boiteAutre = enveloppe.getString("boite")
+                val clair = Chiffrement.dechiffrer(contexte, cleAutre, enveloppe.getString("c")) ?: continue
+                val json = JSONObject(clair)
+                val pseudo = json.getString("pseudo")
+                val texte = json.getString("texte")
+                principal.post {
+                    val connu = appareils[pseudo]
+                    appareils[pseudo] = Appareil(
+                        nom = pseudo,
+                        adresse = null,
+                        port = 0,
+                        numero = null,
+                        cle = cleAutre,
+                        accepte = connu?.accepte ?: false,
+                        boite = boiteAutre,
+                    )
+                    sauverContacts()
+                    messages.add(Message(pseudo, pseudo, texte, moi = false))
+                }
+            } catch (e: Exception) {
+                // Paquet illisible ou mal formé : ignoré.
+            }
         }
     }
 
@@ -325,7 +444,7 @@ object Reseau {
             for (i in 0 until liste.length()) {
                 val o = liste.getJSONObject(i)
                 val nom = o.getString("nom")
-                appareils[nom] = Appareil(nom, null, 0, o.optString("numero").ifBlank { null }, o.optString("cle").ifBlank { null }, accepte = o.optBoolean("accepte", true))
+                appareils[nom] = Appareil(nom, null, 0, o.optString("numero").ifBlank { null }, o.optString("cle").ifBlank { null }, accepte = o.optBoolean("accepte", true), boite = o.optString("boite").ifBlank { null })
             }
         } catch (e: Exception) {
             // Liste illisible : on repart de zéro.
@@ -334,8 +453,8 @@ object Reseau {
 
     private fun sauverContacts() {
         val liste = JSONArray()
-        appareils.values.filter { it.numero != null && it.cle != null }.forEach {
-            liste.put(JSONObject().put("nom", it.nom).put("numero", it.numero).put("cle", it.cle).put("accepte", it.accepte))
+        appareils.values.filter { it.cle != null }.forEach {
+            liste.put(JSONObject().put("nom", it.nom).put("numero", it.numero ?: "").put("cle", it.cle).put("accepte", it.accepte).put("boite", it.boite ?: ""))
         }
         prefs?.edit()?.putString("contacts", liste.toString())?.apply()
     }
