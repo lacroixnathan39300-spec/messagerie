@@ -47,9 +47,8 @@ Le client essaie 1, puis 2, puis 3, puis 4. Le choix est invisible pour l'utilis
 - Clé publique partagée par QR code ou lien.
 
 ## 7. Décisions
-- **Première application du hub** : la messagerie est le premier module de la suite. Les autres modules viendront ensuite.
+- **Messagerie à part, en première application** : elle reste une appli autonome. Un hub regroupant plusieurs applis viendra ensuite.
 - Première version : Android uniquement.
-- **Appli séparée**, sans lien avec Pilote.
 - **Mode oignon activé par défaut** quand suffisamment de relais sont disponibles. Sinon, bascule automatique sur le serveur de secours.
 
 ## 8. Ordre de travail
