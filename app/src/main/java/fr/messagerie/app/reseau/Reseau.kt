@@ -17,6 +17,8 @@ import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.InetAddress
+import java.nio.ByteBuffer
+import java.security.MessageDigest
 import java.net.ServerSocket
 import java.net.Socket
 
@@ -182,6 +184,39 @@ object Reseau {
         val x = a.filter { it.isDigit() }.takeLast(9)
         val y = b.filter { it.isDigit() }.takeLast(9)
         return x.length == 9 && x == y
+    }
+
+    // Envoie notre clé publique par SMS à un contact dont on connaît le numéro.
+    fun envoyerCle(id: String) {
+        val a = appareils[id] ?: return
+        val contexte = appContext ?: return
+        val numero = a.numero ?: return
+        Sms.envoyerCle(contexte, numero)
+        messages.add(Message(id, "système", "Ta clé a été envoyée par SMS. Compare le code de sécurité de vive voix.", moi = false))
+    }
+
+    // Clé reçue par SMS : on l'enregistre, et on répond avec la nôtre si on ne la connaissait pas.
+    fun recevoirCle(expediteur: String, cle: String) {
+        val contexte = appContext ?: return
+        val existant = appareils.values.firstOrNull { memeNumero(it.numero, expediteur) }
+        if (existant?.cle == cle) return
+        val nom = existant?.nom ?: expediteur
+        principal.post {
+            appareils[nom] = Appareil(nom, existant?.adresse, existant?.port ?: 0, expediteur, cle)
+            sauverContacts()
+        }
+        Sms.envoyerCle(contexte, expediteur)
+    }
+
+    // Code à 8 chiffres, identique des deux côtés : à comparer de vive voix pour écarter un intermédiaire.
+    fun codeSecurite(cleAutre: String): String? {
+        val contexte = appContext ?: return null
+        val moi = Chiffrement.clePublique(contexte)
+        val empreinte = MessageDigest.getInstance("SHA-256")
+            .digest(listOf(moi, cleAutre).sorted().joinToString("|").toByteArray(Charsets.UTF_8))
+        val valeur = (ByteBuffer.wrap(empreinte, 0, 4).int and 0x7fffffff) % 100000000
+        val texte = valeur.toString().padStart(8, '0')
+        return texte.substring(0, 4) + " " + texte.substring(4)
     }
 
     // Appelé par le récepteur de SMS : le numéro de l'expéditeur doit être un contact connu.

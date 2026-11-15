@@ -193,7 +193,16 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
             Text("←", color = Texte, fontSize = 20.sp, modifier = Modifier.clickable(onClick = onRetour))
             Column(modifier = Modifier.weight(1f)) {
                 Text(nom, color = Texte, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                Text("Wi-Fi : non chiffré · SMS : chiffré", color = TexteDoux, fontSize = 12.sp)
+                val contact = Reseau.appareils[nom]
+                val code = contact?.cle?.let { Reseau.codeSecurite(it) }
+                Text(
+                    if (code != null) "Code de sécurité : $code" else "Clé pas encore échangée",
+                    color = TexteDoux,
+                    fontSize = 12.sp,
+                )
+            }
+            if (Reseau.appareils[nom]?.cle == null && Reseau.appareils[nom]?.numero != null) {
+                Puce("Envoyer ma clé", Accent, modifier = Modifier.clickable { Reseau.envoyerCle(nom) })
             }
         }
         LazyColumn(
@@ -309,9 +318,9 @@ private fun Bulle(m: Message) {
 }
 
 @Composable
-private fun Puce(texte: String, couleur: Color) {
+private fun Puce(texte: String, couleur: Color, modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(50))
             .border(1.dp, couleur, RoundedCornerShape(50))
             .padding(horizontal = 10.dp, vertical = 3.dp),
