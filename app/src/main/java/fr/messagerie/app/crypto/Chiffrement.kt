@@ -48,20 +48,26 @@ object Chiffrement {
         return generateur.generateKey()
     }
 
-    private fun protegerLocal(clair: ByteArray): String {
+    // Chiffre des données à garder sur ce téléphone (clé privée, messages) avec la clé du Keystore.
+    fun protegerLocal(clair: ByteArray): String {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, cleMaitre())
         return Base64.encodeToString(cipher.iv + cipher.doFinal(clair), Base64.NO_WRAP)
     }
 
-    private fun ouvrirLocal(protege: String): ByteArray {
+    fun ouvrirLocal(protege: String): ByteArray {
         val brut = Base64.decode(protege, Base64.NO_WRAP)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, cleMaitre(), GCMParameterSpec(128, brut.copyOfRange(0, TAILLE_IV)))
         return cipher.doFinal(brut.copyOfRange(TAILLE_IV, brut.size))
     }
 
+    // Gardée en mémoire après la première lecture : évite un appel au Keystore à chaque message.
+    @Volatile private var paireEnMemoire: KeyPair? = null
+
+    @Synchronized
     private fun paire(context: Context): KeyPair {
+        paireEnMemoire?.let { return it }
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val pub = prefs.getString("pub", null)
         val privProtegee = prefs.getString("privProtegee", null)
@@ -69,7 +75,7 @@ object Chiffrement {
         if (pub != null && privProtegee != null) {
             val clePublique = fabrique.generatePublic(X509EncodedKeySpec(Base64.decode(pub, Base64.NO_WRAP)))
             val clePrivee = fabrique.generatePrivate(PKCS8EncodedKeySpec(ouvrirLocal(privProtegee)))
-            return KeyPair(clePublique, clePrivee)
+            return KeyPair(clePublique, clePrivee).also { paireEnMemoire = it }
         }
         val generateur = KeyPairGenerator.getInstance("EC")
         generateur.initialize(ECGenParameterSpec("secp256r1"))
@@ -79,6 +85,7 @@ object Chiffrement {
             .putString("privProtegee", protegerLocal(nouvelle.private.encoded))
             .remove("priv")
             .apply()
+        paireEnMemoire = nouvelle
         return nouvelle
     }
 

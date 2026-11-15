@@ -487,10 +487,16 @@ private fun Conversation(nom: String, onRetour: () -> Unit, onReglages: () -> Un
                     Text("Saisis ton code pour afficher les messages", color = TexteDoux, fontSize = 14.sp)
                     Spacer(Modifier.height(22.dp))
                     Clavier { code ->
+                        val attente = Reseau.attenteCode()
                         when {
-                            Reseau.verifierCode(code) -> { mode = "reelle"; true }
-                            Reseau.verifierLeurre(code) -> { mode = "leurre"; true }
-                            else -> false
+                            attente > 0 -> "Trop d'essais. Réessaie dans ${dureeLisible(attente)}."
+                            Reseau.verifierCode(code) -> { Reseau.noterEssai(true); mode = "reelle"; null }
+                            Reseau.verifierLeurre(code) -> { Reseau.noterEssai(true); mode = "leurre"; null }
+                            else -> {
+                                Reseau.noterEssai(false)
+                                val suite = Reseau.attenteCode()
+                                if (suite > 0) "Code incorrect. Réessaie dans ${dureeLisible(suite)}." else "Code incorrect"
+                            }
                         }
                     }
                 }
@@ -550,15 +556,19 @@ private fun Conversation(nom: String, onRetour: () -> Unit, onReglages: () -> Un
     }
 }
 
-// Clavier à chiffres du verrou. `surCode` renvoie vrai si le code ouvre quelque chose.
+private fun dureeLisible(secondes: Int): String =
+    if (secondes >= 60) "${(secondes + 59) / 60} min" else "$secondes s"
+
+// Clavier à chiffres du verrou. `surCode` renvoie null si le code ouvre quelque chose, sinon le message d'erreur.
 @Composable
-private fun Clavier(surCode: (String) -> Boolean) {
+private fun Clavier(surCode: (String) -> String?) {
     var code by remember { mutableStateOf("") }
-    var faux by remember { mutableStateOf(false) }
+    var erreur by remember { mutableStateOf("") }
+    val faux = erreur.isNotEmpty()
 
     fun valider() {
         if (code.length < 4) return
-        if (!surCode(code)) faux = true
+        erreur = surCode(code) ?: ""
         code = ""
     }
 
@@ -573,13 +583,13 @@ private fun Clavier(surCode: (String) -> Boolean) {
         }
     }
     Spacer(Modifier.height(10.dp))
-    Text(if (faux) "Code incorrect" else " ", color = Danger, fontSize = 13.sp)
+    Text(if (faux) erreur else " ", color = Danger, fontSize = 13.sp, textAlign = TextAlign.Center)
     Spacer(Modifier.height(14.dp))
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         listOf("123", "456", "789").forEach { rangee ->
             Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
                 rangee.forEach { c ->
-                    Touche(onClick = { if (code.length < 8) { code += c; faux = false } }) {
+                    Touche(onClick = { if (code.length < 8) { code += c; erreur = "" } }) {
                         Text(c.toString(), color = Texte, fontSize = 26.sp)
                     }
                 }
@@ -587,7 +597,7 @@ private fun Clavier(surCode: (String) -> Boolean) {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
             Touche(fond = Color.Transparent, onClick = { code = code.dropLast(1) }) { Icone("effacer", TexteDoux, 24.dp) }
-            Touche(onClick = { if (code.length < 8) { code += "0"; faux = false } }) {
+            Touche(onClick = { if (code.length < 8) { code += "0"; erreur = "" } }) {
                 Text("0", color = Texte, fontSize = 26.sp)
             }
             Touche(fond = if (code.length >= 4) Accent else SurfaceHaute, onClick = { valider() }) {
@@ -607,6 +617,17 @@ private fun Touche(fond: Color = Surface, onClick: () -> Unit, contenu: @Composa
 
 @Composable
 private fun Bulle(m: Message) {
+    if (m.de == Reseau.SYSTEME) {
+        Text(
+            m.texte,
+            color = TexteDoux,
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 6.dp),
+        )
+        return
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (m.moi) Arrangement.End else Arrangement.Start,
@@ -639,6 +660,8 @@ private fun Reglages(onRetour: () -> Unit) {
     var numeroSaisi by remember { mutableStateOf(Reseau.monNumero.value) }
     var codeNouveau by remember { mutableStateOf("") }
     var leurreNouveau by remember { mutableStateOf("") }
+    var codeActuel by remember { mutableStateOf("") }
+    var codeActuelLeurre by remember { mutableStateOf("") }
     var infoCode by remember { mutableStateOf("") }
     var infoLeurre by remember { mutableStateOf("") }
     var infoNumero by remember { mutableStateOf("") }
@@ -700,10 +723,18 @@ private fun Reglages(onRetour: () -> Unit) {
 
             SectionReglage("Code d'accès", "cadenas") {
                 LigneEtat("Code d'accès", if (codePose) "Défini" else "À définir", if (codePose) Accent else Ephemere)
+                if (codePose) Champ(
+                    codeActuel,
+                    { codeActuel = it.filter { c -> c.isDigit() }.take(8); infoCode = "" },
+                    "Code actuel",
+                    Modifier.fillMaxWidth(),
+                    fond = Fond,
+                    clavier = KeyboardType.NumberPassword,
+                )
                 Champ(
                     codeNouveau,
                     { codeNouveau = it.filter { c -> c.isDigit() }.take(8); infoCode = "" },
-                    "4 à 8 chiffres",
+                    if (codePose) "Nouveau code, 4 à 8 chiffres" else "4 à 8 chiffres",
                     Modifier.fillMaxWidth(),
                     fond = Fond,
                     clavier = KeyboardType.NumberPassword,
@@ -711,25 +742,35 @@ private fun Reglages(onRetour: () -> Unit) {
                 Bouton(if (codePose) "Changer le code" else "Définir le code", modifier = Modifier.fillMaxWidth()) {
                     infoCode = when {
                         codeNouveau.length < 4 -> "4 chiffres minimum."
+                        codePose && !codeActuelBon(codeActuel) -> messageCodeActuel()
                         leurrePose && Reseau.verifierLeurre(codeNouveau) -> "Ce code est déjà ton code leurre."
                         else -> {
                             Reseau.definirCode(codeNouveau)
                             codeNouveau = ""
+                            codeActuel = ""
                             codePose = true
                             "Code enregistré."
                         }
                     }
                 }
                 if (infoCode.isNotBlank()) Aide(infoCode, if (infoCode == "Code enregistré.") Accent else Danger)
-                Aide("Demandé à chaque ouverture d'une conversation. Sans lui, les messages restent masqués.")
+                Aide("Demandé à chaque ouverture d'une conversation. Sans lui, les messages restent masqués. Il n'existe aucun moyen de le récupérer s'il est oublié.")
             }
 
             SectionReglage("Code leurre", "cadenas", Ephemere) {
                 LigneEtat("Code leurre", if (leurrePose) "Défini" else "Non défini", if (leurrePose) Accent else TexteDoux)
+                if (codePose) Champ(
+                    codeActuelLeurre,
+                    { codeActuelLeurre = it.filter { c -> c.isDigit() }.take(8); infoLeurre = "" },
+                    "Code d'accès actuel",
+                    Modifier.fillMaxWidth(),
+                    fond = Fond,
+                    clavier = KeyboardType.NumberPassword,
+                )
                 Champ(
                     leurreNouveau,
                     { leurreNouveau = it.filter { c -> c.isDigit() }.take(8); infoLeurre = "" },
-                    "4 à 8 chiffres, différent du code",
+                    "Code leurre, 4 à 8 chiffres",
                     Modifier.fillMaxWidth(),
                     fond = Fond,
                     clavier = KeyboardType.NumberPassword,
@@ -740,11 +781,14 @@ private fun Reglages(onRetour: () -> Unit) {
                     couleur = Ephemere,
                 ) {
                     infoLeurre = when {
+                        !codePose -> "Définis d'abord le code d'accès."
                         leurreNouveau.length < 4 -> "4 chiffres minimum."
-                        codePose && Reseau.verifierCode(leurreNouveau) -> "Il doit être différent du code d'accès."
+                        !codeActuelBon(codeActuelLeurre) -> messageCodeActuel()
+                        Reseau.verifierCode(leurreNouveau) -> "Il doit être différent du code d'accès."
                         else -> {
                             Reseau.definirLeurre(leurreNouveau)
                             leurreNouveau = ""
+                            codeActuelLeurre = ""
                             leurrePose = true
                             "Leurre enregistré."
                         }
@@ -774,7 +818,7 @@ private fun Reglages(onRetour: () -> Unit) {
             SectionReglage("Connexions", "reglages") {
                 LigneEtat("SMS", "Chiffré", Accent, "Fonctionne sans internet")
                 Box(Modifier.fillMaxWidth().height(1.dp).background(Separateur))
-                LigneEtat("Wi-Fi local", "Non chiffré", Ephemere, "Entre téléphones du même réseau")
+                LigneEtat("Wi-Fi local", "Partiel", Ephemere, "Chiffré dès que la clé du contact est connue")
                 Box(Modifier.fillMaxWidth().height(1.dp).background(Separateur))
                 LigneEtat(
                     "Relais internet",
@@ -793,6 +837,19 @@ private fun Reglages(onRetour: () -> Unit) {
             )
         }
     }
+}
+
+// Vérifie le code actuel avant un changement, avec la même limite d'essais que le verrou.
+private fun codeActuelBon(saisie: String): Boolean {
+    if (Reseau.attenteCode() > 0) return false
+    val bon = saisie.length >= 4 && Reseau.verifierCode(saisie)
+    Reseau.noterEssai(bon)
+    return bon
+}
+
+private fun messageCodeActuel(): String {
+    val attente = Reseau.attenteCode()
+    return if (attente > 0) "Trop d'essais. Réessaie dans ${dureeLisible(attente)}." else "Code actuel incorrect."
 }
 
 @Composable

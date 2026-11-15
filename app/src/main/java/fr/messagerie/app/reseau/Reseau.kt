@@ -1,5 +1,9 @@
 package fr.messagerie.app.reseau
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.nsd.NsdManager
@@ -18,18 +22,21 @@ import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.net.Socket
+import java.net.URLEncoder
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
-import java.net.ServerSocket
-import java.net.Socket
 
-// Transports :
-//  - Wi-Fi local (même réseau, sans internet) : texte non chiffré pour l'instant.
-//  - SMS (réseau mobile, sans internet) : texte chiffré de bout en bout.
-// La clé publique et le numéro sont échangés sur le Wi-Fi local, puis gardés pour le SMS.
+// Transports, dans l'ordre d'essai :
+//  - Wi-Fi local (même réseau, sans internet) : chiffré dès que la clé du contact est connue.
+//  - Relais internet (contact trouvé par pseudo) : chiffré de bout en bout.
+//  - SMS (réseau mobile, sans internet) : chiffré de bout en bout.
+// Les messages sont gardés sur le téléphone, chiffrés par une clé du Keystore Android.
 
 data class Appareil(
     val nom: String,
@@ -47,6 +54,9 @@ data class Message(val avec: String, val de: String, val texte: String, val moi:
 
 object Reseau {
     private const val TYPE = "_messagerie._tcp."
+    // Expéditeur des notes affichées dans le fil (envoi impossible, clé changée...).
+    const val SYSTEME = "système"
+    private const val MESSAGES_GARDES = 500
 
     private val principal = Handler(Looper.getMainLooper())
 
@@ -70,6 +80,12 @@ object Reseau {
     // Appelé par l'activité à l'ouverture et à la fermeture de l'appli.
     fun surPremierPlan(actif: Boolean) {
         premierPlan = actif
+        if (actif) {
+            viderNoms()
+            try {
+                (appContext?.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)?.cancel(1)
+            } catch (e: Exception) { }
+        }
     }
 
     private var boiteMoi: String? = null
@@ -81,94 +97,132 @@ object Reseau {
     private var nsd: NsdManager? = null
     private var enregistrement: NsdManager.RegistrationListener? = null
     private var decouverte: NsdManager.DiscoveryListener? = null
+    private var initialise = false
+    private var releveLancee = false
 
-    fun demarrer(context: Context) {
-        if (serveur != null) return
+    // Exécute sur le fil principal : tout de suite si on y est déjà (réception d'un SMS appli fermée).
+    private fun surPrincipal(action: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) action() else principal.post(action)
+    }
+
+    // Charge réglages, contacts et messages. Sans réseau : sert aussi au récepteur de SMS, appli fermée.
+    fun initialiser(context: Context) {
+        if (initialise) return
         val contexte = context.applicationContext
         appContext = contexte
         val p = contexte.getSharedPreferences("reseau", Context.MODE_PRIVATE)
         prefs = p
         monNumero.value = p.getString("numero", "") ?: ""
-        chargerContacts(p)
         monPseudo.value = p.getString("pseudo", "") ?: ""
+        // Nom fixe sur le Wi-Fi local : sinon chaque lancement créerait un nouveau contact chez les autres.
+        monNom = p.getString("nom", null)
+            ?: "${Build.MODEL} ${(1000..9999).random()}".also { p.edit().putString("nom", it).apply() }
         boiteMoi = p.getString("boite", null) ?: Relais.aleatoire(16).also { p.edit().putString("boite", it).apply() }
         jetonMoi = p.getString("jeton", null) ?: Relais.aleatoire(32).also { p.edit().putString("jeton", it).apply() }
+        chargerContacts(p)
+        chargerMessages(p)
+        initialise = true
+    }
+
+    fun demarrer(context: Context) {
+        initialiser(context)
+        if (serveur != null) return
+        val contexte = context.applicationContext
+
         // Relève les messages venus par internet, seulement quand l'appli est ouverte et qu'un pseudo existe.
-        // En arrière-plan, rien n'est interrogé : Wi-Fi et SMS restent actifs, et la batterie est préservée.
-        Thread {
-            while (true) {
-                try {
-                    if (premierPlan && monPseudo.value.isNotBlank()) recevoirRelais()
-                } catch (e: Exception) { }
-                Thread.sleep(20000)
+        // En arrière-plan, rien n'est interrogé : la batterie est préservée.
+        if (!releveLancee) {
+            releveLancee = true
+            Thread {
+                while (true) {
+                    try {
+                        if (premierPlan && monPseudo.value.isNotBlank()) recevoirRelais()
+                    } catch (e: Exception) { }
+                    try {
+                        Thread.sleep(20000)
+                    } catch (e: Exception) { }
+                }
+            }.start()
+        }
+
+        // Wi-Fi local : si la découverte échoue, le reste de l'appli (SMS, relais) continue de marcher.
+        try {
+            val gestionnaire = contexte.getSystemService(Context.NSD_SERVICE) as NsdManager
+            nsd = gestionnaire
+
+            val s = ServerSocket(0)
+            serveur = s
+            Thread { ecouter(s) }.start()
+
+            val info = NsdServiceInfo().apply {
+                serviceName = monNom
+                serviceType = TYPE
+                port = s.localPort
             }
-        }.start()
+            val inscription = object : NsdManager.RegistrationListener {
+                override fun onServiceRegistered(i: NsdServiceInfo) {}
+                override fun onRegistrationFailed(i: NsdServiceInfo, code: Int) {}
+                override fun onServiceUnregistered(i: NsdServiceInfo) {}
+                override fun onUnregistrationFailed(i: NsdServiceInfo, code: Int) {}
+            }
+            enregistrement = inscription
+            gestionnaire.registerService(info, NsdManager.PROTOCOL_DNS_SD, inscription)
 
-        val gestionnaire = contexte.getSystemService(Context.NSD_SERVICE) as NsdManager
-        nsd = gestionnaire
-        monNom = "${Build.MODEL} ${(1000..9999).random()}"
+            val recherche = object : NsdManager.DiscoveryListener {
+                override fun onDiscoveryStarted(type: String) {}
+                override fun onDiscoveryStopped(type: String) {}
+                override fun onStartDiscoveryFailed(type: String, code: Int) {}
+                override fun onStopDiscoveryFailed(type: String, code: Int) {}
 
-        val s = ServerSocket(0)
-        serveur = s
-        Thread { ecouter(s) }.start()
-
-        val info = NsdServiceInfo().apply {
-            serviceName = monNom
-            serviceType = TYPE
-            port = s.localPort
-        }
-        val inscription = object : NsdManager.RegistrationListener {
-            override fun onServiceRegistered(i: NsdServiceInfo) {}
-            override fun onRegistrationFailed(i: NsdServiceInfo, code: Int) {}
-            override fun onServiceUnregistered(i: NsdServiceInfo) {}
-            override fun onUnregistrationFailed(i: NsdServiceInfo, code: Int) {}
-        }
-        enregistrement = inscription
-        gestionnaire.registerService(info, NsdManager.PROTOCOL_DNS_SD, inscription)
-
-        val recherche = object : NsdManager.DiscoveryListener {
-            override fun onDiscoveryStarted(type: String) {}
-            override fun onDiscoveryStopped(type: String) {}
-            override fun onStartDiscoveryFailed(type: String, code: Int) {}
-            override fun onStopDiscoveryFailed(type: String, code: Int) {}
-
-            override fun onServiceFound(trouve: NsdServiceInfo) {
-                if (trouve.serviceName == monNom) return
-                gestionnaire.resolveService(trouve, object : NsdManager.ResolveListener {
-                    override fun onResolveFailed(i: NsdServiceInfo, code: Int) {}
-                    override fun onServiceResolved(i: NsdServiceInfo) {
-                        val hote = i.host ?: return
-                        principal.post {
-                            val connu = appareils[i.serviceName]
-                            appareils[i.serviceName] = Appareil(
-                                nom = i.serviceName,
-                                adresse = hote,
-                                port = i.port,
-                                numero = connu?.numero,
-                                cle = connu?.cle,
-                                accepte = connu?.accepte ?: true,
-                            )
-                        }
+                override fun onServiceFound(trouve: NsdServiceInfo) {
+                    if (trouve.serviceName == monNom) return
+                    try {
+                        gestionnaire.resolveService(trouve, object : NsdManager.ResolveListener {
+                            override fun onResolveFailed(i: NsdServiceInfo, code: Int) {}
+                            override fun onServiceResolved(i: NsdServiceInfo) {
+                                val hote = i.host ?: return
+                                principal.post {
+                                    val connu = appareils[i.serviceName]
+                                    appareils[i.serviceName] = Appareil(
+                                        nom = i.serviceName,
+                                        adresse = hote,
+                                        port = i.port,
+                                        numero = connu?.numero,
+                                        cle = connu?.cle,
+                                        accepte = connu?.accepte ?: true,
+                                        boite = connu?.boite,
+                                    )
+                                }
+                            }
+                        })
+                    } catch (e: Exception) {
+                        // Résolution déjà en cours : l'appareil sera retrouvé à la prochaine annonce.
                     }
-                })
-            }
+                }
 
-            override fun onServiceLost(perdu: NsdServiceInfo) {
-                principal.post {
-                    val connu = appareils[perdu.serviceName]
-                    if (connu != null) appareils[perdu.serviceName] = connu.copy(adresse = null)
+                override fun onServiceLost(perdu: NsdServiceInfo) {
+                    principal.post {
+                        val connu = appareils[perdu.serviceName]
+                        if (connu != null) appareils[perdu.serviceName] = connu.copy(adresse = null)
+                    }
                 }
             }
+            decouverte = recherche
+            gestionnaire.discoverServices(TYPE, NsdManager.PROTOCOL_DNS_SD, recherche)
+        } catch (e: Exception) {
+            // Pas de Wi-Fi local sur cet appareil.
         }
-        decouverte = recherche
-        gestionnaire.discoverServices(TYPE, NsdManager.PROTOCOL_DNS_SD, recherche)
     }
 
     fun arreter() {
-        decouverte?.let { nsd?.stopServiceDiscovery(it) }
-        enregistrement?.let { nsd?.unregisterService(it) }
-        serveur?.close()
+        try { decouverte?.let { nsd?.stopServiceDiscovery(it) } } catch (e: Exception) { }
+        try { enregistrement?.let { nsd?.unregisterService(it) } } catch (e: Exception) { }
+        try { serveur?.close() } catch (e: Exception) { }
+        decouverte = null
+        enregistrement = null
         serveur = null
+        // Les adresses Wi-Fi ne valent plus rien une fois la découverte arrêtée.
+        appareils.values.toList().forEach { if (it.adresse != null) appareils[it.nom] = it.copy(adresse = null) }
     }
 
     fun enregistrerNumero(numero: String) {
@@ -178,55 +232,100 @@ object Reseau {
 
     const val LIEN_TELECHARGEMENT = "https://github.com/lacroixnathan39300-spec/messagerie/releases/latest/download/Messagerie.apk"
 
-    // Ouvre une discussion avec un numéro qui n'est pas encore dans la liste.
+    // Ouvre une discussion avec un numéro. Renvoie l'identifiant du contact (existant ou créé).
     fun ouvrirNumero(saisie: String): String? {
         val propre = saisie.filter { it.isDigit() || it == '+' }
         if (propre.length < 6) return null
-        if (appareils.values.none { memeNumero(it.numero, propre) }) {
-            appareils[propre] = Appareil(propre, null, 0, propre, null)
+        val existant = appareils.values.firstOrNull { memeNumero(it.numero, propre) }
+        if (existant != null) {
+            if (!existant.accepte) accepter(existant.nom)
+            return existant.nom
         }
+        appareils[propre] = Appareil(propre, null, 0, propre, null)
+        sauverContacts()
         return propre
     }
+
+    // ------------------------------------------------------------------------------------------
+    // Envoi
+    // ------------------------------------------------------------------------------------------
+
+    private val invites = HashSet<String>()
+
+    private fun ajouter(m: Message) {
+        messages.add(m)
+        sauverMessages()
+    }
+
+    private fun note(id: String, texte: String) = ajouter(Message(id, SYSTEME, texte, moi = false))
 
     fun envoyer(id: String, texte: String) {
         val a = appareils[id] ?: return
         val contexte = appContext ?: return
-        messages.add(Message(id, monNom, texte, moi = true))
-
-        // Contact sans l'appli (pas de clé connue) : on envoie une invitation, pas le message.
-        if (a.adresse == null && a.cle == null) {
-            val numero = a.numero ?: return
-            val expediteur = monNumero.value.ifBlank { "Quelqu'un" }
-            Sms.inviter(numero, "$expediteur t'écrit sur Messagerie. Installe l'appli pour lire le message : $LIEN_TELECHARGEMENT")
-            messages.add(Message(id, "système", "Invitation envoyée par SMS. Le message arrivera quand la personne aura installé l'appli.", moi = false))
-            return
-        }
+        ajouter(Message(id, monNom, texte, moi = true))
 
         val adresse = a.adresse
         if (adresse != null) {
-            val contenu = enveloppe(contexte).put("texte", texte).toString()
-            envoyerTcp(adresse, a.port, contenu)
+            // Wi-Fi local : chiffré si la clé du contact est connue, sinon en clair (premier contact).
+            val contenu = enveloppe(contexte)
+            val cle = a.cle
+            if (cle != null) contenu.put("c", Chiffrement.chiffrer(contexte, cle, texte)) else contenu.put("texte", texte)
+            envoyerTcp(adresse, a.port, contenu.toString()) {
+                // L'appareil n'est plus joignable en Wi-Fi : on tente les autres chemins.
+                principal.post {
+                    val actuel = appareils[id]
+                    if (actuel != null) {
+                        appareils[id] = actuel.copy(adresse = null)
+                        envoyerHorsWifi(actuel, texte, contexte)
+                    }
+                }
+            }
             return
         }
-        // Contact trouvé par pseudo : le message passe par le relais internet, chiffré.
-        val boiteDest = a.boite
-        val cleDest = a.cle
-        if (boiteDest != null && cleDest != null) {
-            val clair = JSONObject().put("pseudo", monPseudo.value).put("texte", texte).toString()
-            val enveloppe = JSONObject()
-                .put("cle", Chiffrement.clePublique(contexte))
-                .put("boite", boiteMoi)
-                .put("c", Chiffrement.chiffrer(contexte, cleDest, clair))
-            val corps = JSONObject().put("boite", boiteDest).put("charge", enveloppe.toString())
-            Thread { Relais.requete("POST", "/v1/envoyer", corps) }.start()
-            return
-        }
+        envoyerHorsWifi(a, texte, contexte)
+    }
 
-        val numero = a.numero
+    private fun envoyerHorsWifi(a: Appareil, texte: String, contexte: Context) {
+        val id = a.nom
         val cle = a.cle
-        if (numero != null && cle != null) {
-            val clair = JSONObject().put("de", monNumero.value).put("texte", texte).toString()
-            Sms.envoyer(contexte, numero, Chiffrement.chiffrer(contexte, cle, clair))
+        val boiteDest = a.boite
+        val numero = a.numero
+        when {
+            // Contact trouvé par pseudo : relais internet, chiffré.
+            boiteDest != null && cle != null -> {
+                val clair = JSONObject().put("pseudo", monPseudo.value).put("texte", texte).toString()
+                val enveloppe = JSONObject()
+                    .put("cle", Chiffrement.clePublique(contexte))
+                    .put("boite", boiteMoi)
+                    .put("c", Chiffrement.chiffrer(contexte, cle, clair))
+                val corps = JSONObject().put("boite", boiteDest).put("charge", enveloppe.toString())
+                Thread {
+                    if (Relais.requete("POST", "/v1/envoyer", corps) == null) {
+                        principal.post { note(id, "Non remis : le relais internet est injoignable.") }
+                    }
+                }.start()
+            }
+            numero != null && cle != null -> {
+                val clair = JSONObject().put("de", monNumero.value).put("texte", texte).toString()
+                if (!Sms.envoyer(contexte, numero, Chiffrement.chiffrer(contexte, cle, clair))) {
+                    note(id, "SMS non envoyé. Autorise les SMS pour Messagerie dans les paramètres du téléphone.")
+                }
+            }
+            // Numéro connu mais pas de clé : la personne n'a pas (encore) l'appli. On l'invite une fois.
+            numero != null -> {
+                if (invites.add(id)) {
+                    val expediteur = monNumero.value.ifBlank { "Quelqu'un" }
+                    val parti = Sms.inviter(numero, "$expediteur t'écrit sur Messagerie. Installe l'appli pour lire ses messages : $LIEN_TELECHARGEMENT")
+                    note(
+                        id,
+                        if (parti) "Invitation envoyée par SMS. Ce message n'a pas été transmis : renvoie-le quand la clé sera échangée."
+                        else "SMS non envoyé. Autorise les SMS pour Messagerie dans les paramètres du téléphone.",
+                    )
+                } else {
+                    note(id, "Non remis : la clé n'est pas encore échangée avec ce contact.")
+                }
+            }
+            else -> note(id, "Non remis : ce contact n'est plus à portée du Wi-Fi.")
         }
     }
 
@@ -244,12 +343,18 @@ object Reseau {
         sauverContacts()
     }
 
+    // Noms du carnet d'adresses déjà cherchés, pour ne pas interroger le carnet à chaque affichage.
+    private val nomsCarnet = HashMap<String, String>()
+
+    fun viderNoms() = nomsCarnet.clear()
+
     // Nom du carnet d'adresses si la permission Contacts est accordée, sinon le numéro ou le pseudo.
     fun nomAffiche(id: String): String {
         val a = appareils[id] ?: return id
         val numero = a.numero ?: return a.nom
+        nomsCarnet[numero]?.let { return it }
         val contexte = appContext ?: return numero
-        return try {
+        val nom = try {
             val uri = android.net.Uri.withAppendedPath(
                 android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
                 android.net.Uri.encode(numero),
@@ -262,20 +367,30 @@ object Reseau {
         } catch (e: Exception) {
             numero
         }
+        nomsCarnet[numero] = nom
+        return nom
     }
+
+    // ------------------------------------------------------------------------------------------
+    // Relais internet (pseudo)
+    // ------------------------------------------------------------------------------------------
 
     // Inscription du pseudo sur le relais : le pseudo est lié à la clé et à la boîte, jamais au numéro.
     fun inscrirePseudo(pseudo: String) {
         val contexte = appContext ?: return
         val propre = pseudo.trim().lowercase()
+        if (propre.length < 3) {
+            statutPseudo.value = "Pseudo trop court (3 à 20 lettres, chiffres, _ . -)"
+            return
+        }
+        statutPseudo.value = "Enregistrement…"
         val corps = JSONObject()
             .put("pseudo", propre)
             .put("cle", Chiffrement.clePublique(contexte))
             .put("boite", boiteMoi)
             .put("jeton", jetonMoi)
         Thread {
-            val reponse = Relais.requete("POST", "/v1/inscrire", corps)
-            val code = Relais.dernierCode
+            val (reponse, code) = Relais.requeteAvecCode("POST", "/v1/inscrire", corps)
             principal.post {
                 if (reponse != null) {
                     monPseudo.value = propre
@@ -294,21 +409,24 @@ object Reseau {
     // Trouve un contact par pseudo sur le relais, puis ouvre la discussion. Renvoie l'identifiant via onResultat.
     fun ouvrirPseudo(pseudo: String, onResultat: (String?) -> Unit) {
         val propre = pseudo.trim().lowercase()
+        val existant = appareils[propre]
+        if (existant != null && existant.accepte) {
+            onResultat(propre)
+            return
+        }
         Thread {
-            val reponse = Relais.requete("GET", "/v1/chercher?pseudo=$propre")
+            val reponse = try {
+                Relais.requete("GET", "/v1/chercher?pseudo=" + URLEncoder.encode(propre, "UTF-8"))
+            } catch (e: Exception) {
+                null
+            }
             principal.post {
-                if (reponse == null) {
+                val cle = reponse?.optString("cle", "").orEmpty()
+                val boite = reponse?.optString("boite", "").orEmpty()
+                if (cle.isEmpty() || boite.isEmpty()) {
                     onResultat(null)
                 } else {
-                    appareils[propre] = Appareil(
-                        nom = propre,
-                        adresse = null,
-                        port = 0,
-                        numero = null,
-                        cle = reponse.getString("cle"),
-                        accepte = true,
-                        boite = reponse.getString("boite"),
-                    )
+                    appareils[propre] = Appareil(propre, null, 0, null, cle, accepte = true, boite = boite)
                     sauverContacts()
                     onResultat(propre)
                 }
@@ -334,17 +452,20 @@ object Reseau {
                 val texte = json.getString("texte")
                 principal.post {
                     val connu = appareils[pseudo]
+                    val cleChangee = connu?.cle != null && connu.cle != cleAutre
                     appareils[pseudo] = Appareil(
                         nom = pseudo,
-                        adresse = null,
-                        port = 0,
-                        numero = null,
+                        adresse = connu?.adresse,
+                        port = connu?.port ?: 0,
+                        numero = connu?.numero,
                         cle = cleAutre,
                         accepte = connu?.accepte ?: false,
                         boite = boiteAutre,
                     )
                     sauverContacts()
-                    messages.add(Message(pseudo, pseudo, texte, moi = false))
+                    if (cleChangee) note(pseudo, "La clé de ce contact a changé. Compare à nouveau le code de sécurité de vive voix.")
+                    ajouter(Message(pseudo, pseudo, texte, moi = false))
+                    notifier()
                 }
             } catch (e: Exception) {
                 // Paquet illisible ou mal formé : ignoré.
@@ -352,7 +473,11 @@ object Reseau {
         }
     }
 
-    // Liaison par code (sans serveur) : côté créateur, codes en attente ; côté destinataire, demandes reçues.
+    // ------------------------------------------------------------------------------------------
+    // Liaison par code (sans serveur, par SMS)
+    // ------------------------------------------------------------------------------------------
+
+    // Côté créateur : codes en attente. Côté destinataire : demandes reçues.
     val codesSortants = mutableStateMapOf<String, String>()
     val liaisonsEntrantes = mutableStateMapOf<String, String>()
     val statutLiaison = mutableStateOf("")
@@ -366,15 +491,19 @@ object Reseau {
             return
         }
         val code = Appairage.nouveauCode()
+        if (!Sms.envoyerTexte(propre, Sms.PREFIXE_P1 + Chiffrement.clePublique(contexte))) {
+            statutLiaison.value = "SMS non envoyé. Autorise les SMS pour Messagerie dans les paramètres du téléphone."
+            return
+        }
         codesSortants[propre] = code
-        Sms.envoyerTexte(propre, Sms.PREFIXE_P1 + Chiffrement.clePublique(contexte))
-        statutLiaison.value = "Donne ce code à la personne, de vive voix : ${Appairage.formater(code)}"
+        statutLiaison.value = "Donne ce code à la personne, de vive voix : ${Appairage.formater(code)}\nGarde l'appli ouverte jusqu'à la confirmation."
     }
 
     fun recevoirP1(expediteur: String, pubA: String) {
-        principal.post {
+        surPrincipal {
             liaisonsEntrantes[expediteur] = pubA
             statutLiaison.value = "Une personne demande à se lier. Saisis le code qu'elle t'a donné."
+            notifier()
         }
     }
 
@@ -388,12 +517,14 @@ object Reseau {
         }
         val pubB = Chiffrement.clePublique(contexte)
         val (k, etiquetteB) = Appairage.repondre(code, pubA, pubB)
+        if (!Sms.envoyerTexte(numero, Sms.PREFIXE_P2 + pubB + "|" + etiquetteB)) {
+            statutLiaison.value = "SMS non envoyé. Autorise les SMS pour Messagerie dans les paramètres du téléphone."
+            return
+        }
+        // Le contact n'est ajouté qu'une fois la confirmation reçue : un mauvais code ne laisse aucune clé.
         liaisonsEnAttente[numero] = k to pubA
-        Sms.envoyerTexte(numero, Sms.PREFIXE_P2 + pubB + "|" + etiquetteB)
-        appareils[numero] = Appareil(nom = numero, adresse = null, port = 0, numero = numero, cle = pubA, accepte = true)
-        sauverContacts()
         liaisonsEntrantes.remove(numero)
-        statutLiaison.value = "Réponse envoyée. La liaison sera confirmée quand l'autre personne aura validé."
+        statutLiaison.value = "Réponse envoyée. Garde l'appli ouverte : la liaison sera confirmée dans un instant."
     }
 
     fun recevoirP2(expediteur: String, charge: String) {
@@ -403,17 +534,19 @@ object Reseau {
         if (morceaux.size != 2) return
         val pubA = Chiffrement.clePublique(contexte)
         val confirmation = Appairage.verifierEtConfirmer(codesSortants[cleCode] ?: return, pubA, morceaux[0], morceaux[1])
-        if (confirmation == null) {
-            statutLiaison.value = "Code incorrect : la liaison n'a pas été faite."
-            return
-        }
-        principal.post {
-            appareils[cleCode] = Appareil(nom = cleCode, adresse = null, port = 0, numero = cleCode, cle = morceaux[0], accepte = true)
-            sauverContacts()
+        surPrincipal {
             codesSortants.remove(cleCode)
-            statutLiaison.value = "Liaison faite. Compare le code de sécurité de vive voix."
+            if (confirmation == null) {
+                statutLiaison.value = "Code incorrect : la liaison n'a pas été faite. Crée un nouveau code."
+            } else {
+                Sms.envoyerTexte(expediteur, Sms.PREFIXE_P3 + confirmation)
+                val existant = appareils.values.firstOrNull { memeNumero(it.numero, cleCode) }
+                val nom = existant?.nom ?: cleCode
+                appareils[nom] = Appareil(nom, existant?.adresse, existant?.port ?: 0, existant?.numero ?: cleCode, morceaux[0], accepte = true, boite = existant?.boite)
+                sauverContacts()
+                statutLiaison.value = "Liaison faite. Vous pouvez vous écrire."
+            }
         }
-        Sms.envoyerTexte(expediteur, Sms.PREFIXE_P3 + confirmation)
     }
 
     fun recevoirP3(expediteur: String, etiquetteA: String) {
@@ -421,19 +554,25 @@ object Reseau {
         val cleEntree = liaisonsEnAttente.keys.firstOrNull { memeNumero(it, expediteur) } ?: return
         val (k, pubA) = liaisonsEnAttente[cleEntree] ?: return
         val pubB = Chiffrement.clePublique(contexte)
-        principal.post {
+        surPrincipal {
             if (Appairage.verifierConfirmation(k, pubA, pubB, etiquetteA)) {
-                statutLiaison.value = "Liaison confirmée des deux côtés."
-            } else {
-                appareils.remove(cleEntree)
+                val existant = appareils.values.firstOrNull { memeNumero(it.numero, cleEntree) }
+                val nom = existant?.nom ?: cleEntree
+                appareils[nom] = Appareil(nom, existant?.adresse, existant?.port ?: 0, existant?.numero ?: cleEntree, pubA, accepte = true, boite = existant?.boite)
                 sauverContacts()
+                statutLiaison.value = "Liaison confirmée des deux côtés. Vous pouvez vous écrire."
+            } else {
                 statutLiaison.value = "Confirmation invalide : liaison annulée."
             }
             liaisonsEnAttente.remove(cleEntree)
         }
     }
 
-    // Code d'accès : demandé à chaque ouverture d'une conversation. Stocké sous forme de empreinte (PBKDF2).
+    // ------------------------------------------------------------------------------------------
+    // Code d'accès et code leurre
+    // ------------------------------------------------------------------------------------------
+
+    // Code d'accès : demandé à chaque ouverture d'une conversation. Stocké sous forme d'empreinte (PBKDF2).
     fun codeDefini(): Boolean = prefs?.contains("codeHash") == true
 
     fun definirCode(code: String) {
@@ -446,12 +585,7 @@ object Reseau {
             .apply()
     }
 
-    fun verifierCode(saisie: String): Boolean {
-        val p = prefs ?: return false
-        val sel = android.util.Base64.decode(p.getString("codeSel", null) ?: return false, android.util.Base64.NO_WRAP)
-        val attendu = android.util.Base64.decode(p.getString("codeHash", null) ?: return false, android.util.Base64.NO_WRAP)
-        return MessageDigest.isEqual(hacher(saisie, sel), attendu)
-    }
+    fun verifierCode(saisie: String): Boolean = verifierEmpreinte(saisie, "codeSel", "codeHash")
 
     // Code leurre : ouvre une fausse conversation, sans rien révéler des vraies. Stocké comme le code d'accès.
     fun leurreDefini(): Boolean = prefs?.contains("leurreHash") == true
@@ -465,11 +599,17 @@ object Reseau {
             .apply()
     }
 
-    fun verifierLeurre(saisie: String): Boolean {
+    fun verifierLeurre(saisie: String): Boolean = verifierEmpreinte(saisie, "leurreSel", "leurreHash")
+
+    private fun verifierEmpreinte(saisie: String, cleSel: String, cleHash: String): Boolean {
         val p = prefs ?: return false
-        val sel = android.util.Base64.decode(p.getString("leurreSel", null) ?: return false, android.util.Base64.NO_WRAP)
-        val attendu = android.util.Base64.decode(p.getString("leurreHash", null) ?: return false, android.util.Base64.NO_WRAP)
-        return MessageDigest.isEqual(hacher(saisie, sel), attendu)
+        return try {
+            val sel = android.util.Base64.decode(p.getString(cleSel, null) ?: return false, android.util.Base64.NO_WRAP)
+            val attendu = android.util.Base64.decode(p.getString(cleHash, null) ?: return false, android.util.Base64.NO_WRAP)
+            MessageDigest.isEqual(hacher(saisie, sel), attendu)
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private fun hacher(code: String, sel: ByteArray): ByteArray {
@@ -477,13 +617,43 @@ object Reseau {
         return fabrique.generateSecret(PBEKeySpec(code.toCharArray(), sel, 200000, 256)).encoded
     }
 
+    // Anti-devinette : après 5 codes faux d'affilée, il faut attendre (30 s, puis le double à chaque
+    // nouvel échec, jusqu'à 1 h). Le compteur survit à la fermeture de l'appli.
+    fun attenteCode(): Int {
+        val jusqua = prefs?.getLong("bloqueJusqua", 0L) ?: 0L
+        val reste = (jusqua - System.currentTimeMillis() + 999) / 1000
+        return reste.coerceIn(0L, 3600L).toInt()
+    }
+
+    fun noterEssai(reussi: Boolean) {
+        val p = prefs ?: return
+        if (reussi) {
+            p.edit().remove("echecs").remove("bloqueJusqua").apply()
+            return
+        }
+        val echecs = p.getInt("echecs", 0) + 1
+        val edition = p.edit().putInt("echecs", echecs)
+        if (echecs >= 5) {
+            val secondes = (30L shl (echecs - 5).coerceAtMost(7)).coerceAtMost(3600L)
+            edition.putLong("bloqueJusqua", System.currentTimeMillis() + secondes * 1000)
+        }
+        edition.apply()
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Clés par SMS
+    // ------------------------------------------------------------------------------------------
+
     // Envoie notre clé publique par SMS à un contact dont on connaît le numéro.
     fun envoyerCle(id: String) {
         val a = appareils[id] ?: return
         val contexte = appContext ?: return
         val numero = a.numero ?: return
-        Sms.envoyerCle(contexte, numero)
-        messages.add(Message(id, "système", "Ta clé a été envoyée par SMS. Compare le code de sécurité de vive voix.", moi = false))
+        if (Sms.envoyerCle(contexte, numero)) {
+            note(id, "Ta clé a été envoyée par SMS. Quand la sienne arrive, compare le code de sécurité de vive voix.")
+        } else {
+            note(id, "SMS non envoyé. Autorise les SMS pour Messagerie dans les paramètres du téléphone.")
+        }
     }
 
     // Clé reçue par SMS : on l'enregistre, et on répond avec la nôtre si on ne la connaissait pas.
@@ -492,9 +662,13 @@ object Reseau {
         val existant = appareils.values.firstOrNull { memeNumero(it.numero, expediteur) }
         if (existant?.cle == cle) return
         val nom = existant?.nom ?: expediteur
-        principal.post {
-            appareils[nom] = Appareil(nom, existant?.adresse, existant?.port ?: 0, expediteur, cle, accepte = existant?.accepte ?: false)
+        surPrincipal {
+            appareils[nom] = Appareil(nom, existant?.adresse, existant?.port ?: 0, existant?.numero ?: expediteur, cle, accepte = existant?.accepte ?: false, boite = existant?.boite)
             sauverContacts()
+            if (existant?.cle != null) {
+                note(nom, "La clé de ce contact a changé. Compare à nouveau le code de sécurité de vive voix.")
+            }
+            notifier()
         }
         Sms.envoyerCle(contexte, expediteur)
     }
@@ -502,26 +676,62 @@ object Reseau {
     // Code à 8 chiffres, identique des deux côtés : à comparer de vive voix pour écarter un intermédiaire.
     fun codeSecurite(cleAutre: String): String? {
         val contexte = appContext ?: return null
-        val moi = Chiffrement.clePublique(contexte)
-        val empreinte = MessageDigest.getInstance("SHA-256")
-            .digest(listOf(moi, cleAutre).sorted().joinToString("|").toByteArray(Charsets.UTF_8))
-        val valeur = (ByteBuffer.wrap(empreinte, 0, 4).int and 0x7fffffff) % 100000000
-        val texte = valeur.toString().padStart(8, '0')
-        return texte.substring(0, 4) + " " + texte.substring(4)
+        return try {
+            val moi = Chiffrement.clePublique(contexte)
+            val empreinte = MessageDigest.getInstance("SHA-256")
+                .digest(listOf(moi, cleAutre).sorted().joinToString("|").toByteArray(Charsets.UTF_8))
+            val valeur = (ByteBuffer.wrap(empreinte, 0, 4).int and 0x7fffffff) % 100000000
+            val texte = valeur.toString().padStart(8, '0')
+            texte.substring(0, 4) + " " + texte.substring(4)
+        } catch (e: Exception) {
+            null
+        }
     }
 
     // Appelé par le récepteur de SMS : le numéro de l'expéditeur doit être un contact connu.
     fun recevoirSms(context: Context, expediteur: String, charge: String) {
         val contact = appareils.values.firstOrNull { memeNumero(it.numero, expediteur) && it.cle != null } ?: return
-        val clair = Chiffrement.dechiffrer(context, contact.cle!!, charge) ?: return
-        try {
-            val json = JSONObject(clair)
-            val texte = json.getString("texte")
-            principal.post { messages.add(Message(contact.nom, contact.nom, texte, moi = false)) }
+        val clair = Chiffrement.dechiffrer(context, contact.cle ?: return, charge) ?: return
+        val texte = try {
+            JSONObject(clair).getString("texte")
         } catch (e: Exception) {
-            // Message mal formé : ignoré.
+            return
+        }
+        surPrincipal {
+            ajouter(Message(contact.nom, contact.nom, texte, moi = false))
+            notifier()
         }
     }
+
+    // Prévient d'un nouveau message quand l'appli n'est pas à l'écran. Ni l'expéditeur ni le contenu n'apparaissent.
+    private fun notifier() {
+        if (premierPlan) return
+        val contexte = appContext ?: return
+        try {
+            val gestionnaire = contexte.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            gestionnaire.createNotificationChannel(
+                NotificationChannel("messages", "Messages", NotificationManager.IMPORTANCE_DEFAULT)
+            )
+            val ouverture = contexte.packageManager.getLaunchIntentForPackage(contexte.packageName) ?: return
+            val action = PendingIntent.getActivity(
+                contexte, 0, ouverture, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            val notification = Notification.Builder(contexte, "messages")
+                .setSmallIcon(android.R.drawable.stat_notify_chat)
+                .setContentTitle("Messagerie")
+                .setContentText("Nouveau message")
+                .setContentIntent(action)
+                .setAutoCancel(true)
+                .build()
+            gestionnaire.notify(1, notification)
+        } catch (e: Exception) {
+            // Notifications refusées : le message reste visible à l'ouverture de l'appli.
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Wi-Fi local
+    // ------------------------------------------------------------------------------------------
 
     private fun enveloppe(context: Context): JSONObject =
         JSONObject()
@@ -529,14 +739,16 @@ object Reseau {
             .put("numero", monNumero.value)
             .put("cle", Chiffrement.clePublique(context))
 
-    private fun envoyerTcp(adresse: InetAddress, port: Int, contenu: String) {
+    private fun envoyerTcp(adresse: InetAddress, port: Int, contenu: String, surEchec: () -> Unit) {
         Thread {
             try {
-                Socket(adresse, port).use { socket ->
+                Socket().use { socket ->
+                    socket.connect(InetSocketAddress(adresse, port), 5000)
                     socket.getOutputStream().write((contenu + "\n").toByteArray(Charsets.UTF_8))
+                    socket.getOutputStream().flush()
                 }
             } catch (e: Exception) {
-                // Échec silencieux pour l'instant.
+                surEchec()
             }
         }.start()
     }
@@ -555,30 +767,47 @@ object Reseau {
     private fun lire(client: Socket) {
         try {
             client.use { c ->
+                c.soTimeout = 10000
+                val contexte = appContext ?: return
                 val ligne = BufferedReader(InputStreamReader(c.getInputStream(), Charsets.UTF_8)).readLine() ?: return
                 val json = JSONObject(ligne)
                 val de = json.getString("de")
+                if (de.isBlank() || de == SYSTEME) return
                 val numero = json.optString("numero", "").ifBlank { null }
                 val cle = json.optString("cle", "").ifBlank { null }
-                val texte = json.getString("texte")
+                val chiffre = json.optString("c", "")
+                val texte = if (chiffre.isNotEmpty()) {
+                    Chiffrement.dechiffrer(contexte, cle ?: return, chiffre) ?: return
+                } else {
+                    json.getString("texte")
+                }
                 principal.post {
                     val connu = appareils[de]
+                    // Une clé déjà enregistrée n'est jamais remplacée par le Wi-Fi : n'importe qui peut y prendre un nom.
+                    val cleDifferente = connu?.cle != null && cle != null && connu.cle != cle
                     appareils[de] = Appareil(
                         nom = de,
                         adresse = connu?.adresse,
                         port = connu?.port ?: 0,
-                        numero = numero ?: connu?.numero,
-                        cle = cle ?: connu?.cle,
+                        numero = connu?.numero ?: numero,
+                        cle = connu?.cle ?: cle,
                         accepte = connu?.accepte ?: false,
+                        boite = connu?.boite,
                     )
                     sauverContacts()
-                    messages.add(Message(de, de, texte, moi = false))
+                    if (cleDifferente) note(de, "Attention : le message suivant vient d'un appareil dont la clé ne correspond pas à celle enregistrée.")
+                    ajouter(Message(de, de, texte, moi = false))
+                    notifier()
                 }
             }
         } catch (e: Exception) {
             // Message mal formé ou connexion coupée : ignoré.
         }
     }
+
+    // ------------------------------------------------------------------------------------------
+    // Sauvegarde sur le téléphone
+    // ------------------------------------------------------------------------------------------
 
     private fun chargerContacts(p: SharedPreferences) {
         val brut = p.getString("contacts", null) ?: return
@@ -587,7 +816,13 @@ object Reseau {
             for (i in 0 until liste.length()) {
                 val o = liste.getJSONObject(i)
                 val nom = o.getString("nom")
-                appareils[nom] = Appareil(nom, null, 0, o.optString("numero").ifBlank { null }, o.optString("cle").ifBlank { null }, accepte = o.optBoolean("accepte", true), boite = o.optString("boite").ifBlank { null })
+                appareils[nom] = Appareil(
+                    nom, null, 0,
+                    o.optString("numero").ifBlank { null },
+                    o.optString("cle").ifBlank { null },
+                    accepte = o.optBoolean("accepte", true),
+                    boite = o.optString("boite").ifBlank { null },
+                )
             }
         } catch (e: Exception) {
             // Liste illisible : on repart de zéro.
@@ -596,9 +831,39 @@ object Reseau {
 
     private fun sauverContacts() {
         val liste = JSONArray()
-        appareils.values.filter { it.cle != null }.forEach {
-            liste.put(JSONObject().put("nom", it.nom).put("numero", it.numero ?: "").put("cle", it.cle).put("accepte", it.accepte).put("boite", it.boite ?: ""))
+        appareils.values.filter { it.cle != null || it.numero != null }.forEach {
+            liste.put(
+                JSONObject().put("nom", it.nom).put("numero", it.numero ?: "").put("cle", it.cle ?: "")
+                    .put("accepte", it.accepte).put("boite", it.boite ?: "")
+            )
         }
         prefs?.edit()?.putString("contacts", liste.toString())?.apply()
+    }
+
+    // Les messages sont gardés chiffrés par la clé du Keystore : illisibles hors de ce téléphone.
+    private fun chargerMessages(p: SharedPreferences) {
+        val brut = p.getString("messages", null) ?: return
+        try {
+            val liste = JSONArray(String(Chiffrement.ouvrirLocal(brut), Charsets.UTF_8))
+            for (i in 0 until liste.length()) {
+                val o = liste.getJSONObject(i)
+                messages.add(Message(o.getString("a"), o.getString("d"), o.getString("t"), o.getBoolean("m")))
+            }
+        } catch (e: Exception) {
+            // Historique illisible (clé du Keystore perdue) : on repart de zéro.
+        }
+    }
+
+    private fun sauverMessages() {
+        try {
+            val liste = JSONArray()
+            messages.takeLast(MESSAGES_GARDES).forEach {
+                liste.put(JSONObject().put("a", it.avec).put("d", it.de).put("t", it.texte).put("m", it.moi))
+            }
+            val protege = Chiffrement.protegerLocal(liste.toString().toByteArray(Charsets.UTF_8))
+            prefs?.edit()?.putString("messages", protege)?.apply()
+        } catch (e: Exception) {
+            // Sauvegarde impossible : le message reste affiché jusqu'à la fermeture de l'appli.
+        }
     }
 }

@@ -19,43 +19,49 @@ object Sms {
     const val PREFIXE_P2 = "RG1P2:"
     const val PREFIXE_P3 = "RG1P3:"
 
-    fun envoyerTexte(numero: String, texte: String) {
+    // Renvoie faux si le SMS n'a pas pu partir (permission refusée, pas de carte SIM...).
+    private fun expedier(numero: String, texte: String): Boolean = try {
         val gestionnaire = SmsManager.getDefault()
         gestionnaire.sendMultipartTextMessage(numero, null, gestionnaire.divideMessage(texte), null, null)
+        true
+    } catch (e: Exception) {
+        false
     }
+
+    fun envoyerTexte(numero: String, texte: String): Boolean = expedier(numero, texte)
 
     // Invitation en clair à installer l'appli, pour un contact qui ne l'a pas encore.
-    fun inviter(numero: String, texte: String) {
-        val gestionnaire = SmsManager.getDefault()
-        gestionnaire.sendMultipartTextMessage(numero, null, gestionnaire.divideMessage(texte), null, null)
-    }
+    fun inviter(numero: String, texte: String): Boolean = expedier(numero, texte)
 
-    fun envoyerCle(context: Context, numero: String) {
-        val gestionnaire = SmsManager.getDefault()
-        val charge = PREFIXE_CLE + Chiffrement.clePublique(context)
-        gestionnaire.sendMultipartTextMessage(numero, null, gestionnaire.divideMessage(charge), null, null)
-    }
+    fun envoyerCle(context: Context, numero: String): Boolean =
+        expedier(numero, PREFIXE_CLE + Chiffrement.clePublique(context))
 
-    fun envoyer(context: Context, numero: String, charge: String) {
-        val gestionnaire = SmsManager.getDefault()
-        val morceaux = gestionnaire.divideMessage(PREFIXE + charge)
-        gestionnaire.sendMultipartTextMessage(numero, null, morceaux, null, null)
-    }
+    fun envoyer(context: Context, numero: String, charge: String): Boolean = expedier(numero, PREFIXE + charge)
 }
 
 class RecepteurSms : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
+        // L'appli peut être fermée : on recharge contacts et messages avant de traiter le SMS.
+        try {
+            Reseau.initialiser(context)
+        } catch (e: Exception) {
+            return
+        }
         // Un SMS long arrive en plusieurs morceaux : on les recolle par expéditeur.
         messages.groupBy { it.originatingAddress ?: "" }.forEach { (expediteur, morceaux) ->
             val corps = morceaux.joinToString("") { it.messageBody ?: "" }
-            when {
+            try {
+              when {
                 corps.startsWith(Sms.PREFIXE_CLE) -> Reseau.recevoirCle(expediteur, corps.removePrefix(Sms.PREFIXE_CLE))
                 corps.startsWith(Sms.PREFIXE_P1) -> Reseau.recevoirP1(expediteur, corps.removePrefix(Sms.PREFIXE_P1))
                 corps.startsWith(Sms.PREFIXE_P2) -> Reseau.recevoirP2(expediteur, corps.removePrefix(Sms.PREFIXE_P2))
                 corps.startsWith(Sms.PREFIXE_P3) -> Reseau.recevoirP3(expediteur, corps.removePrefix(Sms.PREFIXE_P3))
                 corps.startsWith(Sms.PREFIXE) -> Reseau.recevoirSms(context, expediteur, corps.removePrefix(Sms.PREFIXE))
+              }
+            } catch (e: Exception) {
+                // SMS mal formé : ignoré, sans faire planter le récepteur.
             }
         }
     }
