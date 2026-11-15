@@ -133,6 +133,7 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
                 Text("OK", color = Fond, fontWeight = FontWeight.SemiBold)
             }
         }
+        LiaisonParCode()
         if (demandes.isNotEmpty()) {
             Text(
                 "Demandes (${demandes.size})",
@@ -176,6 +177,61 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
                 modifier = Modifier.clickable(onClick = onReglages),
             )
         }
+    }
+}
+
+@Composable
+private fun LiaisonParCode() {
+    var numero by remember { mutableStateOf("") }
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Lier quelqu'un par code (sans serveur, par SMS)", color = TexteDoux, fontSize = 12.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextField(
+                value = numero,
+                onValueChange = { numero = it },
+                placeholder = { Text("Numéro", color = TexteDoux) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(50),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Surface,
+                    unfocusedContainerColor = Surface,
+                    focusedTextColor = Texte,
+                    unfocusedTextColor = Texte,
+                    cursorColor = Accent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                ),
+            )
+            Puce("Créer un code", Accent, modifier = Modifier.clickable { Reseau.creerLiaison(numero) })
+        }
+        if (Reseau.statutLiaison.value.isNotBlank()) {
+            Text(Reseau.statutLiaison.value, color = Ephemere, fontSize = 13.sp)
+        }
+        Reseau.liaisonsEntrantes.keys.forEach { n -> LiaisonEntrante(n) }
+    }
+}
+
+@Composable
+private fun LiaisonEntrante(numero: String) {
+    var code by remember { mutableStateOf("") }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextField(
+            value = code,
+            onValueChange = { code = it },
+            placeholder = { Text("12 chiffres de $numero", color = TexteDoux) },
+            modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(50),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Surface,
+                unfocusedContainerColor = Surface,
+                focusedTextColor = Texte,
+                unfocusedTextColor = Texte,
+                cursorColor = Accent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+            ),
+        )
+        Puce("Valider", Accent, modifier = Modifier.clickable { Reseau.validerLiaison(numero, code) })
     }
 }
 

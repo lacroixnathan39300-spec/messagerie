@@ -10,6 +10,7 @@ import android.os.Looper
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import fr.messagerie.app.crypto.Appairage
 import fr.messagerie.app.crypto.Chiffrement
 import fr.messagerie.app.sms.Sms
 import org.json.JSONArray
@@ -341,6 +342,87 @@ object Reseau {
             } catch (e: Exception) {
                 // Paquet illisible ou mal formé : ignoré.
             }
+        }
+    }
+
+    // Liaison par code (sans serveur) : côté créateur, codes en attente ; côté destinataire, demandes reçues.
+    val codesSortants = mutableStateMapOf<String, String>()
+    val liaisonsEntrantes = mutableStateMapOf<String, String>()
+    val statutLiaison = mutableStateOf("")
+    private val liaisonsEnAttente = mutableMapOf<String, Pair<ByteArray, String>>()
+
+    fun creerLiaison(numero: String) {
+        val contexte = appContext ?: return
+        val propre = numero.filter { it.isDigit() || it == '+' }
+        if (propre.length < 6) {
+            statutLiaison.value = "Numéro invalide."
+            return
+        }
+        val code = Appairage.nouveauCode()
+        codesSortants[propre] = code
+        Sms.envoyerTexte(propre, Sms.PREFIXE_P1 + Chiffrement.clePublique(contexte))
+        statutLiaison.value = "Donne ce code à la personne, de vive voix : ${Appairage.formater(code)}"
+    }
+
+    fun recevoirP1(expediteur: String, pubA: String) {
+        principal.post {
+            liaisonsEntrantes[expediteur] = pubA
+            statutLiaison.value = "Une personne demande à se lier. Saisis le code qu'elle t'a donné."
+        }
+    }
+
+    fun validerLiaison(numero: String, saisie: String) {
+        val contexte = appContext ?: return
+        val pubA = liaisonsEntrantes[numero] ?: return
+        val code = Appairage.normaliser(saisie)
+        if (code.length != 12) {
+            statutLiaison.value = "Le code fait 12 chiffres."
+            return
+        }
+        val pubB = Chiffrement.clePublique(contexte)
+        val (k, etiquetteB) = Appairage.repondre(code, pubA, pubB)
+        liaisonsEnAttente[numero] = k to pubA
+        Sms.envoyerTexte(numero, Sms.PREFIXE_P2 + pubB + "|" + etiquetteB)
+        appareils[numero] = Appareil(nom = numero, adresse = null, port = 0, numero = numero, cle = pubA, accepte = true)
+        sauverContacts()
+        liaisonsEntrantes.remove(numero)
+        statutLiaison.value = "Réponse envoyée. La liaison sera confirmée quand l'autre personne aura validé."
+    }
+
+    fun recevoirP2(expediteur: String, charge: String) {
+        val contexte = appContext ?: return
+        val cleCode = codesSortants.keys.firstOrNull { memeNumero(it, expediteur) } ?: return
+        val morceaux = charge.split("|", limit = 2)
+        if (morceaux.size != 2) return
+        val pubA = Chiffrement.clePublique(contexte)
+        val confirmation = Appairage.verifierEtConfirmer(codesSortants[cleCode] ?: return, pubA, morceaux[0], morceaux[1])
+        if (confirmation == null) {
+            statutLiaison.value = "Code incorrect : la liaison n'a pas été faite."
+            return
+        }
+        principal.post {
+            appareils[cleCode] = Appareil(nom = cleCode, adresse = null, port = 0, numero = cleCode, cle = morceaux[0], accepte = true)
+            sauverContacts()
+            codesSortants.remove(cleCode)
+            statutLiaison.value = "Liaison faite. Compare le code de sécurité de vive voix."
+        }
+        Sms.envoyerTexte(expediteur, Sms.PREFIXE_P3 + confirmation)
+    }
+
+    fun recevoirP3(expediteur: String, etiquetteA: String) {
+        val contexte = appContext ?: return
+        val cleEntree = liaisonsEnAttente.keys.firstOrNull { memeNumero(it, expediteur) } ?: return
+        val (k, pubA) = liaisonsEnAttente[cleEntree] ?: return
+        val pubB = Chiffrement.clePublique(contexte)
+        principal.post {
+            if (Appairage.verifierConfirmation(k, pubA, pubB, etiquetteA)) {
+                statutLiaison.value = "Liaison confirmée des deux côtés."
+            } else {
+                appareils.remove(cleEntree)
+                sauverContacts()
+                statutLiaison.value = "Confirmation invalide : liaison annulée."
+            }
+            liaisonsEnAttente.remove(cleEntree)
         }
     }
 
