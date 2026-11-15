@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Bulle de message verte, avec sa queue : l'icône de la messagerie chiffrée. -->
+    <path
+        android:fillColor="#FF3DDC97"
+        android:pathData="M30,34 L78,34 Q86,34 86,42 L86,62 Q86,70 78,70 L56,70 L44,80 L44,70 L30,70 Q22,70 22,62 L22,42 Q22,34 30,34 Z" />
+    <!-- Cadenas au centre de la bulle. -->
+    <path
+        android:fillColor="#FF0E1116"
+        android:pathData="M48,46 Q48,40 54,40 Q60,40 60,46 L60,48 L62,48 L62,60 L46,60 L46,48 L48,48 Z M52,46 L52,48 L56,48 L56,46 Q56,44 54,44 Q52,44 52,46 Z" />
+</vector>
