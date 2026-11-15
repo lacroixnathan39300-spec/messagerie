@@ -1,9 +1,9 @@
 package fr.messagerie.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,16 +11,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.border
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,44 +29,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.messagerie.app.reseau.Appareil
+import fr.messagerie.app.reseau.Message
+import fr.messagerie.app.reseau.Reseau
 
-// Exemples uniquement : aucune donnée réelle n'est affichée.
-private data class Discussion(
-    val nom: String,
-    val initiales: String,
-    val couleur: Color,
-    val apercu: String,
-    val heure: String,
-    val trajet: String,
-    val ephemere: String?,
-)
-
-private val discussions = listOf(
-    Discussion("Camille", "C", Accent, "Message éphémère · ouvert", "09:12", "Direct", "Expire 1 h"),
-    Discussion("Équipe test", "É", Color(0xFF7AA7FF), "Relais : 3 sauts, livré", "08:47", "Oignon", null),
-    Discussion("Marc", "M", Ephemere, "Photo vue unique", "Hier", "Secours", "Vue unique"),
-    Discussion("Maison", "M", Color(0xFFC594FF), "En attente de relais", "Lun.", "File d'attente", null),
-)
+private val couleursContacts = listOf(Accent, Color(0xFF7AA7FF), Ephemere, Color(0xFFC594FF))
 
 @Composable
 fun MessagerieApp() {
     var ecran by remember { mutableStateOf("discussions") }
-    var discussionOuverte by remember { mutableStateOf<String?>(null) }
+    var appareilOuvert by remember { mutableStateOf<String?>(null) }
 
     MessagerieTheme {
+        val ouvert = appareilOuvert
         when {
             ecran == "reglages" -> Reglages(onRetour = { ecran = "discussions" })
-            discussionOuverte != null -> Conversation(
-                nom = discussionOuverte!!,
-                onRetour = { discussionOuverte = null },
-            )
+            ouvert != null -> Conversation(nom = ouvert, onRetour = { appareilOuvert = null })
             else -> ListeDiscussions(
-                onOuvrir = { discussionOuverte = it },
+                onOuvrir = { appareilOuvert = it },
                 onReglages = { ecran = "reglages" },
             )
         }
@@ -74,6 +61,8 @@ fun MessagerieApp() {
 
 @Composable
 private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit) {
+    val appareils = Reseau.appareils.values.sortedBy { it.nom }
+
     Column(modifier = Modifier.fillMaxSize().background(Fond).statusBarsPadding()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
@@ -81,21 +70,25 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text("Discussions", color = Texte, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            Puce("Chiffré", Accent)
+            Puce("Chiffrement à venir", Ephemere)
         }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Surface)
-                .padding(12.dp),
-        ) {
-            Text("Rechercher", color = TexteDoux, fontSize = 14.sp)
+        Text(
+            "Appareils à proximité (même Wi-Fi) : ${appareils.size}",
+            color = TexteDoux,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+        )
+        if (appareils.isEmpty()) {
+            Text(
+                "Aucun appareil trouvé. Ouvre la messagerie sur l'autre téléphone, connecté au même Wi-Fi.",
+                color = TexteDoux,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(20.dp),
+            )
         }
         LazyColumn(modifier = Modifier.weight(1f)) {
-            items(discussions) { d ->
-                LigneDiscussion(d, onClick = { onOuvrir(d.nom) })
+            items(appareils) { a ->
+                LigneAppareil(a, onClick = { onOuvrir(a.nom) })
             }
         }
         Row(
@@ -103,7 +96,6 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             Text("Discussions", color = Accent, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-            Text("Relais", color = TexteDoux, fontSize = 13.sp)
             Text(
                 "Réglages",
                 color = TexteDoux,
@@ -115,7 +107,9 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
 }
 
 @Composable
-private fun LigneDiscussion(d: Discussion, onClick: () -> Unit) {
+private fun LigneAppareil(a: Appareil, onClick: () -> Unit) {
+    val couleur = couleursContacts[(a.nom.hashCode() and Int.MAX_VALUE) % couleursContacts.size]
+    val dernier = Reseau.messages.lastOrNull { it.avec == a.nom }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -125,27 +119,29 @@ private fun LigneDiscussion(d: Discussion, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
-            modifier = Modifier.size(44.dp).clip(CircleShape).background(d.couleur),
+            modifier = Modifier.size(44.dp).clip(CircleShape).background(couleur),
             contentAlignment = Alignment.Center,
         ) {
-            Text(d.initiales, color = Fond, fontWeight = FontWeight.SemiBold)
+            Text(a.nom.take(1).uppercase(), color = Fond, fontWeight = FontWeight.SemiBold)
         }
         Column(modifier = Modifier.weight(1f)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(d.nom, color = Texte, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                Text(d.heure, color = TexteDoux, fontSize = 12.sp)
-            }
-            Text(d.apercu, color = TexteDoux, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Puce(d.trajet, TexteDoux)
-                d.ephemere?.let { Puce(it, Ephemere) }
-            }
+            Text(a.nom, color = Texte, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(
+                dernier?.texte ?: "Pas encore de message",
+                color = TexteDoux,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
 
 @Composable
 private fun Conversation(nom: String, onRetour: () -> Unit) {
+    var saisie by remember { mutableStateOf("") }
+    val fil = Reseau.messages.filter { it.avec == nom }
+
     Column(modifier = Modifier.fillMaxSize().background(Fond).statusBarsPadding().navigationBarsPadding()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
@@ -155,35 +151,50 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
             Text("←", color = Texte, fontSize = 20.sp, modifier = Modifier.clickable(onClick = onRetour))
             Column(modifier = Modifier.weight(1f)) {
                 Text(nom, color = Texte, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                Text("Chiffré · Direct", color = Accent, fontSize = 12.sp)
+                Text("Wi-Fi local · non chiffré pour l'instant", color = TexteDoux, fontSize = 12.sp)
             }
-            Puce("1 h", Ephemere)
         }
-        Column(
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.Bottom,
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Bulle("Tu es dispo demain ?", Surface, Texte, aGauche = true)
-            Spacer(Modifier.height(8.dp))
-            Bulle("Oui, je te confirme ce soir.", Color(0xFF1F3A2E), Texte, aGauche = false)
-            Spacer(Modifier.height(8.dp))
-            Bulle("Message éphémère : disparaît dans 58 min", Surface, Ephemere, aGauche = true)
+            items(fil) { m -> Bulle(m) }
         }
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            TextField(
+                value = saisie,
+                onValueChange = { saisie = it },
+                placeholder = { Text("Message", color = TexteDoux) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(50),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Surface,
+                    unfocusedContainerColor = Surface,
+                    focusedTextColor = Texte,
+                    unfocusedTextColor = Texte,
+                    cursorColor = Accent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                ),
+            )
             Box(
                 modifier = Modifier
-                    .weight(1f)
                     .clip(RoundedCornerShape(50))
-                    .background(Surface)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .background(Accent)
+                    .clickable {
+                        if (saisie.isNotBlank()) {
+                            Reseau.envoyer(nom, saisie.trim())
+                            saisie = ""
+                        }
+                    }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
             ) {
-                Text("Message", color = TexteDoux, fontSize = 15.sp)
+                Text("Envoyer", color = Fond, fontWeight = FontWeight.SemiBold)
             }
-            Puce("Envoyer", Accent)
         }
     }
 }
@@ -199,30 +210,19 @@ private fun Reglages(onRetour: () -> Unit) {
         )
         Text("Réglages", color = Texte, fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(20.dp))
+        Text("Nom affiché sur le réseau local : ${Reseau.monNom}", color = TexteDoux, fontSize = 13.sp)
+        Spacer(Modifier.height(20.dp))
         Ligne("Local (proximité)", "Activé", Accent)
-        Ligne("Internet direct", "Activé", Accent)
-        Ligne("Oignon (3 sauts)", "Par défaut", Accent)
-        Ligne("Serveur de secours", "Dernier recours", TexteDoux)
-        Spacer(Modifier.height(20.dp))
-        Ligne("Durée par défaut", "1 h", Ephemere)
-        Ligne("Effacer après lecture", "Oui", Accent)
-        Ligne("Bloquer les captures", "Oui", Accent)
-        Spacer(Modifier.height(20.dp))
-        Text(
-            "Aucun numéro de téléphone requis. Les clés restent sur cet appareil.",
-            color = TexteDoux,
-            fontSize = 12.sp,
-        )
+        Ligne("Internet direct", "Bientôt", TexteDoux)
+        Ligne("Oignon (3 sauts)", "Bientôt", TexteDoux)
+        Ligne("Serveur de secours", "Bientôt", TexteDoux)
     }
 }
 
 @Composable
 private fun Ligne(libelle: String, valeur: String, couleur: Color) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Surface, RoundedCornerShape(0.dp))
-            .padding(vertical = 14.dp, horizontal = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(libelle, color = Texte, fontSize = 15.sp)
@@ -232,18 +232,18 @@ private fun Ligne(libelle: String, valeur: String, couleur: Color) {
 }
 
 @Composable
-private fun Bulle(texte: String, fond: Color, couleurTexte: Color, aGauche: Boolean) {
+private fun Bulle(m: Message) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (aGauche) Arrangement.Start else Arrangement.End,
+        horizontalArrangement = if (m.moi) Arrangement.End else Arrangement.Start,
     ) {
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(16.dp))
-                .background(fond)
+                .background(if (m.moi) Color(0xFF1F3A2E) else Surface)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
-            Text(texte, color = couleurTexte, fontSize = 15.sp)
+            Text(m.texte, color = Texte, fontSize = 15.sp)
         }
     }
 }
