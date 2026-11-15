@@ -12,6 +12,12 @@ import fr.messagerie.app.reseau.Reseau
 object Sms {
     const val PREFIXE = "RG1:"
 
+    // Invitation en clair à installer l'appli, pour un contact qui ne l'a pas encore.
+    fun inviter(numero: String, texte: String) {
+        val gestionnaire = SmsManager.getDefault()
+        gestionnaire.sendMultipartTextMessage(numero, null, gestionnaire.divideMessage(texte), null, null)
+    }
+
     fun envoyer(context: Context, numero: String, charge: String) {
         val gestionnaire = SmsManager.getDefault()
         val morceaux = gestionnaire.divideMessage(PREFIXE + charge)

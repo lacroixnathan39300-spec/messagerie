@@ -136,10 +136,31 @@ object Reseau {
         prefs?.edit()?.putString("numero", monNumero.value)?.apply()
     }
 
+    const val LIEN_TELECHARGEMENT = "https://github.com/lacroixnathan39300-spec/messagerie/releases"
+
+    // Ouvre une discussion avec un numéro qui n'est pas encore dans la liste.
+    fun ouvrirNumero(saisie: String): String? {
+        val propre = saisie.filter { it.isDigit() || it == '+' }
+        if (propre.length < 6) return null
+        if (appareils.values.none { it.numero == propre }) {
+            appareils[propre] = Appareil(propre, null, 0, propre, null)
+        }
+        return propre
+    }
+
     fun envoyer(id: String, texte: String) {
         val a = appareils[id] ?: return
         val contexte = appContext ?: return
         messages.add(Message(id, monNom, texte, moi = true))
+
+        // Contact sans l'appli (pas de clé connue) : on envoie une invitation, pas le message.
+        if (a.adresse == null && a.cle == null) {
+            val numero = a.numero ?: return
+            val expediteur = monNumero.value.ifBlank { "Quelqu'un" }
+            Sms.inviter(numero, "$expediteur t'écrit sur Messagerie. Installe l'appli pour lire le message : $LIEN_TELECHARGEMENT")
+            messages.add(Message(id, "système", "Invitation envoyée par SMS. Le message arrivera quand la personne aura installé l'appli.", moi = false))
+            return
+        }
 
         val adresse = a.adresse
         if (adresse != null) {

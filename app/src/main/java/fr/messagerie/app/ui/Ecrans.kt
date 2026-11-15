@@ -78,6 +78,48 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
             fontSize = 12.sp,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
         )
+        var numeroSaisi by remember { mutableStateOf("") }
+        var erreur by remember { mutableStateOf(false) }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TextField(
+                value = numeroSaisi,
+                onValueChange = { numeroSaisi = it; erreur = false },
+                placeholder = { Text("Écrire à un numéro", color = TexteDoux) },
+                isError = erreur,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(50),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Surface,
+                    unfocusedContainerColor = Surface,
+                    focusedTextColor = Texte,
+                    unfocusedTextColor = Texte,
+                    cursorColor = Accent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                ),
+            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Accent)
+                    .clickable {
+                        val ouvert = Reseau.ouvrirNumero(numeroSaisi)
+                        if (ouvert != null) {
+                            numeroSaisi = ""
+                            onOuvrir(ouvert)
+                        } else {
+                            erreur = true
+                        }
+                    }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+            ) {
+                Text("OK", color = Fond, fontWeight = FontWeight.SemiBold)
+            }
+        }
         if (appareils.isEmpty()) {
             Text(
                 "Aucun appareil trouvé. Ouvre la messagerie sur l'autre téléphone, connecté au même Wi-Fi.",
