@@ -61,7 +61,8 @@ fun MessagerieApp() {
 
 @Composable
 private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit) {
-    val appareils = Reseau.appareils.values.sortedBy { it.nom }
+    val appareils = Reseau.appareils.values.filter { it.accepte }.sortedBy { it.nom }
+    val demandes = Reseau.appareils.values.filter { !it.accepte }
 
     Column(modifier = Modifier.fillMaxSize().background(Fond).statusBarsPadding()) {
         Row(
@@ -120,6 +121,24 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
                 Text("OK", color = Fond, fontWeight = FontWeight.SemiBold)
             }
         }
+        if (demandes.isNotEmpty()) {
+            Text(
+                "Demandes (${demandes.size})",
+                color = Ephemere,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+            demandes.forEach { d ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(Reseau.nomAffiche(d.nom), color = Texte, fontSize = 15.sp)
+                    Puce("Accepter", Accent, modifier = Modifier.clickable { Reseau.accepter(d.nom) })
+                }
+            }
+        }
         if (appareils.isEmpty()) {
             Text(
                 "Aucun appareil trouvé. Ouvre la messagerie sur l'autre téléphone, connecté au même Wi-Fi.",
@@ -167,7 +186,7 @@ private fun LigneAppareil(a: Appareil, onClick: () -> Unit) {
             Text(a.nom.take(1).uppercase(), color = Fond, fontWeight = FontWeight.SemiBold)
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(a.nom, color = Texte, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(Reseau.nomAffiche(a.nom), color = Texte, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Text(
                 dernier?.texte ?: "Pas encore de message",
                 color = TexteDoux,
@@ -192,7 +211,7 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
         ) {
             Text("←", color = Texte, fontSize = 20.sp, modifier = Modifier.clickable(onClick = onRetour))
             Column(modifier = Modifier.weight(1f)) {
-                Text(nom, color = Texte, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text(Reseau.nomAffiche(nom), color = Texte, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 val contact = Reseau.appareils[nom]
                 val code = contact?.cle?.let { Reseau.codeSecurite(it) }
                 Text(

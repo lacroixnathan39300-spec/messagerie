@@ -33,6 +33,8 @@ data class Appareil(
     val port: Int,
     val numero: String?,
     val cle: String?,
+    // Un contact inconnu qui écrit reste en « demande » tant qu'on ne l'a pas accepté.
+    val accepte: Boolean = true,
 )
 
 data class Message(val avec: String, val de: String, val texte: String, val moi: Boolean)
@@ -109,6 +111,7 @@ object Reseau {
                                 port = i.port,
                                 numero = connu?.numero,
                                 cle = connu?.cle,
+                                accepte = connu?.accepte ?: true,
                             )
                         }
                     }
@@ -186,6 +189,32 @@ object Reseau {
         return x.length == 9 && x == y
     }
 
+    fun accepter(id: String) {
+        val a = appareils[id] ?: return
+        appareils[id] = a.copy(accepte = true)
+        sauverContacts()
+    }
+
+    // Nom du carnet d'adresses si la permission Contacts est accordée, sinon le numéro ou le pseudo.
+    fun nomAffiche(id: String): String {
+        val a = appareils[id] ?: return id
+        val numero = a.numero ?: return a.nom
+        val contexte = appContext ?: return numero
+        return try {
+            val uri = android.net.Uri.withAppendedPath(
+                android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                android.net.Uri.encode(numero),
+            )
+            contexte.contentResolver.query(
+                uri,
+                arrayOf(android.provider.ContactsContract.PhoneLookup.DISPLAY_NAME),
+                null, null, null,
+            )?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: numero
+        } catch (e: Exception) {
+            numero
+        }
+    }
+
     // Envoie notre clé publique par SMS à un contact dont on connaît le numéro.
     fun envoyerCle(id: String) {
         val a = appareils[id] ?: return
@@ -202,7 +231,7 @@ object Reseau {
         if (existant?.cle == cle) return
         val nom = existant?.nom ?: expediteur
         principal.post {
-            appareils[nom] = Appareil(nom, existant?.adresse, existant?.port ?: 0, expediteur, cle)
+            appareils[nom] = Appareil(nom, existant?.adresse, existant?.port ?: 0, expediteur, cle, accepte = existant?.accepte ?: false)
             sauverContacts()
         }
         Sms.envoyerCle(contexte, expediteur)
@@ -278,6 +307,7 @@ object Reseau {
                         port = connu?.port ?: 0,
                         numero = numero ?: connu?.numero,
                         cle = cle ?: connu?.cle,
+                        accepte = connu?.accepte ?: false,
                     )
                     sauverContacts()
                     messages.add(Message(de, de, texte, moi = false))
@@ -295,7 +325,7 @@ object Reseau {
             for (i in 0 until liste.length()) {
                 val o = liste.getJSONObject(i)
                 val nom = o.getString("nom")
-                appareils[nom] = Appareil(nom, null, 0, o.optString("numero").ifBlank { null }, o.optString("cle").ifBlank { null })
+                appareils[nom] = Appareil(nom, null, 0, o.optString("numero").ifBlank { null }, o.optString("cle").ifBlank { null }, accepte = o.optBoolean("accepte", true))
             }
         } catch (e: Exception) {
             // Liste illisible : on repart de zéro.
@@ -305,7 +335,7 @@ object Reseau {
     private fun sauverContacts() {
         val liste = JSONArray()
         appareils.values.filter { it.numero != null && it.cle != null }.forEach {
-            liste.put(JSONObject().put("nom", it.nom).put("numero", it.numero).put("cle", it.cle))
+            liste.put(JSONObject().put("nom", it.nom).put("numero", it.numero).put("cle", it.cle).put("accepte", it.accepte))
         }
         prefs?.edit()?.putString("contacts", liste.toString())?.apply()
     }

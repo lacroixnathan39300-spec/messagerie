@@ -13,7 +13,7 @@ class MainActivity : ComponentActivity() {
         // Bloque les captures d'écran et l'aperçu dans le sélecteur d'applis.
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         Reseau.demarrer(applicationContext)
-        requestPermissions(arrayOf(android.Manifest.permission.SEND_SMS, android.Manifest.permission.RECEIVE_SMS), 1)
+        requestPermissions(arrayOf(android.Manifest.permission.SEND_SMS, android.Manifest.permission.RECEIVE_SMS, android.Manifest.permission.READ_CONTACTS), 1)
         setContent {
             MessagerieApp()
         }
