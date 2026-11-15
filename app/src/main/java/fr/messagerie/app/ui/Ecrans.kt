@@ -1,6 +1,22 @@
 package fr.messagerie.app.ui
 
+import android.net.Uri
+import android.widget.MediaController
+import android.widget.VideoView
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.viewinterop.AndroidView
+import fr.messagerie.app.media.Media
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Canvas
@@ -581,6 +597,13 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
     val nomAffiche = Reseau.nomAffiche(nom)
     val etatListe = rememberLazyListState()
     val duree = if (mode == "leurre") ephemereLeurre else (Reseau.ephemeres[nom] ?: 0)
+    // Photo ou vidéo choisie, en attente d'envoi.
+    var piece by remember { mutableStateOf<Uri?>(null) }
+    var vueUnique by remember { mutableStateOf(false) }
+    var visionne by remember(Reseau.session.value) { mutableStateOf<Message?>(null) }
+    val selecteur = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) piece = uri
+    }
 
     LaunchedEffect(fil.size, mode) {
         if (mode != "verrouillee" && fil.isNotEmpty()) etatListe.animateScrollToItem(fil.size)
@@ -600,6 +623,17 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
             val derniere = filLeurre.lastOrNull { !it.moi }?.texte
             filLeurre.add(Message("", "Moi", REPONSES_LEURRE.filter { it != derniere }.random(), moi = false))
         }
+    }
+
+    // Photo ou vidéo ouverte en plein écran.
+    val ouvert = visionne
+    if (ouvert != null && mode != "verrouillee") {
+        Visionneuse(ouvert) {
+            // Une « vue unique » reçue est détruite dès qu'on la referme.
+            if (ouvert.vueUnique && !ouvert.moi) Reseau.consommer(ouvert.id)
+            visionne = null
+        }
+        return
     }
 
     Column(modifier = Modifier.fillMaxSize().background(Fond).statusBarsPadding().navigationBarsPadding().imePadding()) {
@@ -729,7 +763,7 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
                             val suiteDuMeme = i > 0 && fil[i - 1].moi == m.moi && fil[i - 1].de != Reseau.SYSTEME &&
                                 memeJour(fil[i - 1].heure, m.heure)
                             Spacer(Modifier.height(if (suiteDuMeme) 3.dp else 10.dp))
-                            Bulle(m)
+                            Bulle(m) { visionne = it }
                         }
                     }
                     item { Spacer(Modifier.height(10.dp)) }
@@ -744,19 +778,71 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
                 )
             }
+            if (piece != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Surface)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icone("photo", Accent, 20.dp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Photo ou vidéo prête", color = Texte, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            if (vueUnique) "Vue unique : visible une seule fois" else "Appuie sur envoyer",
+                            color = if (vueUnique) Ephemere else TexteDoux,
+                            fontSize = 12.sp,
+                        )
+                    }
+                    Text("Vue unique", color = TexteDoux, fontSize = 12.sp)
+                    Bascule(vueUnique) { vueUnique = it }
+                    Box(
+                        modifier = Modifier.size(32.dp).clip(CircleShape).clickable { piece = null; vueUnique = false },
+                        contentAlignment = Alignment.Center,
+                    ) { Icone("fermer", TexteDoux, 16.dp) }
+                }
+            }
             Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 12.dp, top = 6.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                Box(
+                    modifier = Modifier
+                        .padding(bottom = 4.dp)
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .clickable {
+                            // Le choix se fait hors de l'appli : la conversation ne doit pas se reverrouiller.
+                            Reseau.choixEnCours = true
+                            try {
+                                selecteur.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                            } catch (e: Exception) {
+                                Reseau.choixEnCours = false
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) { Icone("plus", if (piece != null) Accent else TexteDoux, 24.dp) }
                 Champ(saisie, { saisie = it }, "Message", Modifier.weight(1f), uneLigne = false, rayon = 26)
                 Box(
                     modifier = Modifier
                         .padding(bottom = 4.dp)
                         .size(48.dp)
                         .clip(CircleShape)
-                        .background(if (saisie.isBlank()) SurfaceHaute else if (duree > 0) Ephemere else Accent)
+                        .background(if (saisie.isBlank() && piece == null) SurfaceHaute else if (duree > 0) Ephemere else Accent)
                         .clickable {
+                            val jointe = piece
+                            if (jointe != null) {
+                                // En mode leurre, la photo apparaît dans le fil mais ne part nulle part.
+                                if (mode == "leurre") filLeurre.add(Message("", "Moi", "", moi = true, statut = Statut.ENVOI, type = Media.PHOTO))
+                                else Reseau.envoyerMedia(nom, jointe, vueUnique)
+                                piece = null
+                                vueUnique = false
+                            }
                             val texte = saisie.trim()
                             if (texte.isNotEmpty()) {
                                 // En mode leurre, le message reste à l'écran et ne part nulle part.
@@ -766,7 +852,7 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
                             }
                         },
                     contentAlignment = Alignment.Center,
-                ) { Icone("envoyer", if (saisie.isBlank()) TexteDoux else Fond, 22.dp) }
+                ) { Icone("envoyer", if (saisie.isBlank() && piece == null) TexteDoux else Fond, 22.dp) }
             }
         }
     }
@@ -898,7 +984,7 @@ private fun Touche(fond: Color = Surface, onClick: () -> Unit, contenu: @Composa
 }
 
 @Composable
-private fun Bulle(m: Message) {
+private fun Bulle(m: Message, surOuvrir: (Message) -> Unit = {}) {
     if (m.de == Reseau.SYSTEME) {
         Text(
             m.texte,
@@ -920,14 +1006,18 @@ private fun Bulle(m: Message) {
             bottomEnd = if (m.moi) 5.dp else 20.dp,
             bottomStart = if (m.moi) 20.dp else 5.dp,
         )
-        Box(
-            modifier = Modifier
-                .widthIn(max = 290.dp)
-                .clip(forme)
-                .background(if (m.moi) Accent else Surface)
-                .padding(horizontal = 14.dp, vertical = 9.dp),
-        ) {
-            Text(m.texte, color = if (m.moi) Fond else Texte, fontSize = 15.sp, lineHeight = 21.sp)
+        if (m.type != 0) {
+            ContenuMedia(m, forme, surOuvrir)
+        } else {
+            Box(
+                modifier = Modifier
+                    .widthIn(max = 290.dp)
+                    .clip(forme)
+                    .background(if (m.moi) Accent else Surface)
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+            ) {
+                Text(m.texte, color = if (m.moi) Fond else Texte, fontSize = 15.sp, lineHeight = 21.sp)
+            }
         }
         Row(
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -948,6 +1038,130 @@ private fun Bulle(m: Message) {
                 }
                 if (libelle.isNotEmpty()) Text("· $libelle", color = couleur, fontSize = 11.sp)
             }
+        }
+    }
+}
+
+// Photo (aperçu), vidéo ou « vue unique » dans le fil.
+@Composable
+private fun ContenuMedia(m: Message, forme: RoundedCornerShape, surOuvrir: (Message) -> Unit) {
+    val video = m.type == Media.VIDEO
+    val quoi = if (video) "Vidéo" else "Photo"
+    val masquee = m.vueUnique && !m.moi
+    if (m.media != null && !video && !masquee) {
+        val image = produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, m.id) {
+            value = withContext(Dispatchers.IO) {
+                Reseau.octetsMedia(m)?.let { Media.image(it, 640) }?.asImageBitmap()
+            }
+        }.value
+        if (image != null) {
+            Image(
+                bitmap = image,
+                contentDescription = "Photo",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .widthIn(max = 250.dp)
+                    .heightIn(max = 330.dp)
+                    .clip(forme)
+                    .clickable { surOuvrir(m) },
+            )
+            return
+        }
+    }
+    // Tuile : vidéo, vue unique, ou photo qui n'est plus (ou pas encore) affichable.
+    val ouvrable = m.media != null
+    val (titre, detail) = when {
+        m.media == null && m.vueUnique && m.moi -> "$quoi à vue unique" to "Envoyée"
+        m.media == null && m.vueUnique -> "$quoi vue" to "Vue unique : elle a été effacée"
+        m.media == null -> quoi to ""
+        masquee -> "$quoi à vue unique" to "Appuie pour voir, une seule fois"
+        video -> "Vidéo" to "Appuie pour lire"
+        else -> "Photo" to "Chargement…"
+    }
+    val accent = if (m.vueUnique) Ephemere else Accent
+    Row(
+        modifier = Modifier
+            .widthIn(max = 290.dp)
+            .clip(forme)
+            .background(Surface)
+            .clickable(enabled = ouvrable) { surOuvrir(m) }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier.size(40.dp).clip(CircleShape).background(accent.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) { Icone(if (video) "lecture" else "photo", accent, 20.dp) }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(titre, color = Texte, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            if (detail.isNotEmpty()) Text(detail, color = TexteDoux, fontSize = 12.sp)
+        }
+    }
+}
+
+// Photo ou vidéo en plein écran. Les captures d'écran sont bloquées dans toute l'appli.
+@Composable
+private fun Visionneuse(m: Message, onFermer: () -> Unit) {
+    BackHandler(onBack = onFermer)
+    DisposableEffect(m.id) {
+        onDispose { Reseau.finLecture() }
+    }
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black).statusBarsPadding().navigationBarsPadding()) {
+        if (m.type == Media.VIDEO) {
+            val fichier = produceState<java.io.File?>(null, m.id) {
+                value = withContext(Dispatchers.IO) { Reseau.fichierLecture(m) }
+            }.value
+            if (fichier != null) {
+                AndroidView(
+                    modifier = Modifier.align(Alignment.Center).fillMaxWidth(),
+                    factory = { contexte ->
+                        VideoView(contexte).apply {
+                            setVideoPath(fichier.absolutePath)
+                            val commandes = MediaController(contexte)
+                            commandes.setAnchorView(this)
+                            setMediaController(commandes)
+                            setOnPreparedListener { start() }
+                        }
+                    },
+                )
+            }
+        } else {
+            val image = produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, m.id) {
+                value = withContext(Dispatchers.IO) {
+                    Reseau.octetsMedia(m)?.let { Media.image(it, 2048) }?.asImageBitmap()
+                }
+            }.value
+            if (image != null) {
+                Image(
+                    bitmap = image,
+                    contentDescription = "Photo",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .padding(12.dp)
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable(onClick = onFermer),
+            contentAlignment = Alignment.Center,
+        ) { Icone("fermer", Color.White, 20.dp) }
+        if (m.vueUnique && !m.moi) {
+            Text(
+                "Vue unique : effacée dès que tu fermes",
+                color = Ephemere,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 24.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
+            )
         }
     }
 }
@@ -1141,7 +1355,9 @@ private fun Reglages(onRetour: () -> Unit) {
             SectionReglage("Connexions", "reglages") {
                 LigneEtat("SMS", "Chiffré", Accent, "Fonctionne sans internet")
                 Box(Modifier.fillMaxWidth().height(1.dp).background(Separateur))
-                LigneEtat("Wi-Fi local", "Partiel", Ephemere, "Chiffré dès que la clé du contact est connue")
+                LigneEtat("MMS", "Chiffré", Accent, "Photos à distance, avec les données mobiles")
+                Box(Modifier.fillMaxWidth().height(1.dp).background(Separateur))
+                LigneEtat("Wi-Fi local", "Partiel", Ephemere, "Texte, photos et vidéos. Chiffré dès que la clé est connue")
             }
 
             Text(
@@ -1390,6 +1606,19 @@ private fun Icone(type: String, couleur: Color, taille: Dp = 22.dp) {
                     style = trait,
                 )
                 brise(0.3f, 0.7f, 0.3f, 0.88f, 0.5f, 0.7f)
+            }
+            "plus" -> { ligne(0.5f, 0.2f, 0.5f, 0.8f); ligne(0.2f, 0.5f, 0.8f, 0.5f) }
+            "fermer" -> { ligne(0.25f, 0.25f, 0.75f, 0.75f); ligne(0.75f, 0.25f, 0.25f, 0.75f) }
+            "lecture" -> brise(0.36f, 0.24f, 0.76f, 0.5f, 0.36f, 0.76f, 0.36f, 0.24f)
+            "photo" -> {
+                drawRoundRect(
+                    couleur,
+                    topLeft = p(0.1f, 0.22f),
+                    size = Size(w * 0.8f, h * 0.58f),
+                    cornerRadius = CornerRadius(w * 0.12f, w * 0.12f),
+                    style = trait,
+                )
+                drawCircle(couleur, radius = w * 0.15f, center = p(0.5f, 0.51f), style = trait)
             }
             "menu" -> {
                 drawCircle(couleur, radius = w * 0.075f, center = p(0.5f, 0.22f))

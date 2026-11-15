@@ -24,6 +24,8 @@ class MainActivity : ComponentActivity() {
             arrayOf(
                 android.Manifest.permission.SEND_SMS,
                 android.Manifest.permission.RECEIVE_SMS,
+                android.Manifest.permission.RECEIVE_MMS,
+                android.Manifest.permission.READ_SMS,
                 android.Manifest.permission.READ_CONTACTS,
                 "android.permission.POST_NOTIFICATIONS",
             ),

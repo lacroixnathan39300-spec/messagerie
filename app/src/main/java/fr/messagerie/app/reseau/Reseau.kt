@@ -16,11 +16,15 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import fr.messagerie.app.crypto.Appairage
 import fr.messagerie.app.crypto.Chiffrement
+import fr.messagerie.app.media.Media
+import fr.messagerie.app.sms.Mms
 import fr.messagerie.app.sms.Sms
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.InputStream
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -57,6 +61,12 @@ data class Message(
     val statut: Int = Statut.AUCUN,
     // Message éphémère : instant où il s'efface (0 = jamais).
     val expire: Long = 0,
+    // Photo ou vidéo : 0 = texte, sinon Media.PHOTO ou Media.VIDEO.
+    val type: Int = 0,
+    // Fichier chiffré gardé sur le téléphone, et sa clé. Absent une fois une « vue unique » regardée.
+    val media: String? = null,
+    val cleMedia: String? = null,
+    val vueUnique: Boolean = false,
 )
 
 // États d'un message envoyé.
@@ -103,15 +113,20 @@ object Reseau {
     // Appelé par l'activité à l'ouverture et à la fermeture de l'appli.
     fun surPremierPlan(actif: Boolean) {
         premierPlan = actif
-        if (!actif) session.value = session.value + 1
+        // Le choix d'une photo fait sortir de l'appli un instant : la conversation reste ouverte.
+        if (!actif && !choixEnCours) session.value = session.value + 1
         if (actif) {
+            choixEnCours = false
             purger()
+            releverMmsEnFond()
             viderNoms()
             try {
                 (appContext?.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)?.cancel(1)
             } catch (e: Exception) { }
         }
     }
+
+    @Volatile var choixEnCours = false
 
     private var appContext: Context? = null
     private var prefs: SharedPreferences? = null
@@ -124,18 +139,26 @@ object Reseau {
 
     // Efface les messages éphémères arrivés à échéance, toutes les 5 secondes.
     private val tic = object : Runnable {
+        private var tours = 0
         override fun run() {
             purger()
+            tours++
+            if (premierPlan && tours % 3 == 0) releverMmsEnFond()
             principal.postDelayed(this, 5000)
         }
     }
 
     fun purger() {
         val maintenant = System.currentTimeMillis()
-        if (messages.any { it.expire in 1..maintenant }) {
-            messages.removeAll { it.expire in 1..maintenant }
-            sauverMessages()
-        }
+        if (messages.any { it.expire in 1..maintenant }) retirer { it.expire in 1..maintenant }
+    }
+
+    // Retire des messages et supprime leurs photos et vidéos.
+    private fun retirer(lesquels: (Message) -> Boolean) {
+        val contexte = appContext
+        if (contexte != null) messages.filter(lesquels).forEach { m -> m.media?.let { Media.supprimer(contexte, it) } }
+        messages.removeAll(lesquels)
+        sauverMessages()
     }
 
     // Exécute sur le fil principal : tout de suite si on y est déjà (réception d'un SMS appli fermée).
@@ -161,6 +184,8 @@ object Reseau {
         chargerCarte(p, "ephemeres") { nom, o -> ephemeres[nom] = o.optInt(nom, 0) }
         initialise = true
         purger()
+        // Fichiers orphelins (messages trop anciens, lecture interrompue) : supprimés.
+        Media.nettoyer(contexte, messages.mapNotNull { it.media }.toSet())
     }
 
     fun demarrer(context: Context) {
@@ -381,11 +406,210 @@ object Reseau {
         val a = appareils[nom] ?: return
         val contexte = appContext ?: return
         if (a.cle == null) return
-        messages.filter { it.avec == nom && it.moi && it.statut == Statut.ATTENTE }.forEach { m ->
+        messages.filter { it.avec == nom && it.moi && it.type == 0 && it.statut == Statut.ATTENTE }.forEach { m ->
             majStatut(m.id, Statut.ENVOI)
             val reste = if (m.expire > 0) ((m.expire - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(1) else 0
             acheminer(a, m, contexte, reste)
         }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Photos et vidéos
+    // ------------------------------------------------------------------------------------------
+
+    // Contenu envoyé : [taille de l'en-tête][en-tête JSON : type, vue unique, durée][photo ou vidéo].
+    private fun emballer(type: Int, vueUnique: Boolean, duree: Int, octets: ByteArray): ByteArray {
+        val entete = JSONObject().put("type", type).put("vue", vueUnique).put("ttl", duree).toString().toByteArray(Charsets.UTF_8)
+        return ByteBuffer.allocate(4 + entete.size + octets.size).putInt(entete.size).put(entete).put(octets).array()
+    }
+
+    // Envoie une photo ou une vidéo choisie dans la galerie. Wi-Fi local si le contact est à portée, sinon MMS.
+    fun envoyerMedia(id: String, uri: android.net.Uri, vueUnique: Boolean) {
+        val contexte = appContext ?: return
+        val depart = appareils[id] ?: return
+        val cle = depart.cle
+        if (cle == null) {
+            note(id, "Échange d'abord la clé avec ce contact pour envoyer une photo ou une vidéo.")
+            return
+        }
+        val duree = ephemeres[id] ?: 0
+        Thread {
+            try {
+                val video = Media.estVideo(contexte, uri)
+                val type = if (video) Media.VIDEO else Media.PHOTO
+                val enWifi = depart.adresse != null
+                // Qualité complète en Wi-Fi ; version allégée pour tenir dans un MMS.
+                val octets = when {
+                    video && enWifi -> Media.brut(contexte, uri, Media.MAX_VIDEO)
+                    video -> Media.brut(contexte, uri, Media.MAX_MMS)
+                    enWifi -> Media.photo(contexte, uri, 1600, 82, 3 * 1024 * 1024)
+                    else -> Media.photo(contexte, uri, 1024, 70, Media.MAX_MMS)
+                }
+                if (octets == null) {
+                    principal.post {
+                        note(
+                            id,
+                            when {
+                                video && enWifi -> "Vidéo trop lourde (15 Mo au maximum)."
+                                video -> "Vidéo trop lourde pour un MMS. Elle peut partir quand vous êtes sur le même Wi-Fi."
+                                else -> "Cette photo n'a pas pu être lue."
+                            },
+                        )
+                    }
+                    return@Thread
+                }
+                // Une « vue unique » n'est pas gardée chez l'expéditeur.
+                val garde = if (vueUnique) null else Media.garder(contexte, octets)
+                val m = Message(
+                    id, monNom, "", moi = true,
+                    statut = Statut.ENVOI,
+                    expire = if (duree > 0) System.currentTimeMillis() + duree * 1000L else 0,
+                    type = type, media = garde?.first, cleMedia = garde?.second, vueUnique = vueUnique,
+                )
+                principal.post { ajouter(m) }
+                val chiffre = Chiffrement.chiffrerOctets(contexte, cle, emballer(type, vueUnique, duree, octets))
+                val adresse = depart.adresse
+                if (adresse != null) {
+                    val entete = enveloppe(contexte).put("m", chiffre.size).toString()
+                    envoyerTcp(
+                        adresse, depart.port, entete,
+                        surSucces = { majStatut(m.id, Statut.REMIS) },
+                        surEchec = {
+                            // Plus à portée du Wi-Fi : une photo peut encore partir en MMS, allégée.
+                            val leger = if (video) (if (octets.size <= Media.MAX_MMS) octets else null)
+                            else Media.photo(contexte, uri, 1024, 70, Media.MAX_MMS)
+                            val numero = depart.numero
+                            if (leger != null && numero != null) {
+                                envoyerParMms(contexte, id, numero, cle, m.id, emballer(type, vueUnique, duree, leger))
+                            } else {
+                                majStatut(m.id, Statut.ECHEC)
+                                principal.post { note(id, "Non remis : ce contact n'est plus à portée du Wi-Fi.") }
+                            }
+                        },
+                        piece = chiffre,
+                    )
+                } else {
+                    val numero = depart.numero
+                    if (numero == null) {
+                        majStatut(m.id, Statut.ECHEC)
+                        principal.post { note(id, "Non remis : ce contact n'est plus à portée du Wi-Fi.") }
+                    } else if (!Mms.envoyer(contexte, numero, Mms.PREFIXE + android.util.Base64.encodeToString(chiffre, android.util.Base64.NO_WRAP), m.id)) {
+                        majStatut(m.id, Statut.ECHEC)
+                        principal.post { note(id, "MMS non envoyé. Vérifie les données mobiles et l'autorisation SMS de Messagerie.") }
+                    }
+                }
+            } catch (e: Throwable) {
+                principal.post { note(id, "Envoi impossible : fichier trop lourd pour ce téléphone.") }
+            }
+        }.start()
+    }
+
+    private fun envoyerParMms(contexte: Context, id: String, numero: String, cle: String, idMessage: String, clair: ByteArray) {
+        val chiffre = Chiffrement.chiffrerOctets(contexte, cle, clair)
+        val texte = Mms.PREFIXE + android.util.Base64.encodeToString(chiffre, android.util.Base64.NO_WRAP)
+        if (!Mms.envoyer(contexte, numero, texte, idMessage)) {
+            majStatut(idMessage, Statut.ECHEC)
+            principal.post { note(id, "MMS non envoyé. Vérifie les données mobiles et l'autorisation SMS de Messagerie.") }
+        }
+    }
+
+    // Photo ou vidéo reçue et déjà déchiffrée : on la range, chiffrée, sur le téléphone.
+    private fun recevoirMedia(nom: String, clair: ByteArray, cleSiNouveau: String? = null, numeroSiNouveau: String? = null) {
+        val contexte = appContext ?: return
+        try {
+            val tampon = ByteBuffer.wrap(clair)
+            val tailleEntete = tampon.int
+            if (tailleEntete <= 0 || tailleEntete > 4096 || tailleEntete > clair.size - 4) return
+            val entete = JSONObject(String(clair, 4, tailleEntete, Charsets.UTF_8))
+            val octets = clair.copyOfRange(4 + tailleEntete, clair.size)
+            val type = if (entete.optInt("type", Media.PHOTO) == Media.VIDEO) Media.VIDEO else Media.PHOTO
+            val (fichier, cleFichier) = Media.garder(contexte, octets)
+            if (appareils[nom] == null) {
+                appareils[nom] = Appareil(nom, null, 0, numeroSiNouveau, cleSiNouveau, accepte = false)
+                sauverContacts()
+            }
+            ajouter(
+                Message(
+                    nom, nom, "", moi = false,
+                    expire = echeance(entete.optInt("ttl", 0)),
+                    type = type, media = fichier, cleMedia = cleFichier, vueUnique = entete.optBoolean("vue", false),
+                )
+            )
+            notifier()
+        } catch (e: Throwable) {
+            // Contenu illisible : ignoré.
+        }
+    }
+
+    // MMS : relus dans la boîte de réception du téléphone, hors du fil principal.
+    @Volatile private var releveEnCours = false
+
+    private fun releverMmsEnFond() {
+        val contexte = appContext ?: return
+        Thread { releverMms(contexte) }.start()
+    }
+
+    fun releverMms(context: Context) {
+        if (releveEnCours) return
+        releveEnCours = true
+        try {
+            val trouves = Mms.relever(context.applicationContext)
+            if (trouves.isEmpty()) return
+            principal.post {
+                try {
+                    initialiser(context)
+                    trouves.forEach { (expediteur, contenu) -> recevoirMms(expediteur, contenu) }
+                } catch (e: Throwable) { }
+            }
+        } catch (e: Throwable) {
+        } finally {
+            releveEnCours = false
+        }
+    }
+
+    private fun recevoirMms(expediteur: String?, contenu: String) {
+        val contexte = appContext ?: return
+        val brut = try {
+            android.util.Base64.decode(contenu, android.util.Base64.DEFAULT)
+        } catch (e: Exception) {
+            return
+        }
+        // Le contact est celui dont la clé ouvre le contenu : d'abord le numéro annoncé, puis les autres.
+        val candidats = appareils.values.filter { it.cle != null }
+            .sortedByDescending { memeNumero(it.numero, expediteur) }
+        for (contact in candidats) {
+            val clair = Chiffrement.dechiffrerOctets(contexte, contact.cle ?: continue, brut) ?: continue
+            recevoirMedia(contact.nom, clair)
+            return
+        }
+    }
+
+    // Contenu déchiffré d'une photo ou d'une vidéo, pour l'affichage.
+    fun octetsMedia(m: Message): ByteArray? {
+        val contexte = appContext ?: return null
+        return Media.lire(contexte, m.media ?: return null, m.cleMedia ?: return null)
+    }
+
+    fun fichierLecture(m: Message): File? {
+        val contexte = appContext ?: return null
+        return Media.fichierLecture(contexte, m.media ?: return null, m.cleMedia ?: return null)
+    }
+
+    // Efface les copies provisoires déchiffrées (vidéo en cours de lecture).
+    fun finLecture() {
+        val contexte = appContext ?: return
+        try { File(contexte.cacheDir, "lecture").listFiles()?.forEach { it.delete() } } catch (e: Exception) { }
+    }
+
+    // Une « vue unique » vient d'être regardée : le fichier est détruit, il reste la trace « vue ».
+    fun consommer(idMessage: String) {
+        val i = messages.indexOfFirst { it.id == idMessage }
+        if (i < 0) return
+        val m = messages[i]
+        val contexte = appContext
+        if (contexte != null && m.media != null) Media.supprimer(contexte, m.media)
+        messages[i] = m.copy(media = null, cleMedia = null)
+        sauverMessages()
     }
 
     // ------------------------------------------------------------------------------------------
@@ -454,8 +678,7 @@ object Reseau {
     }
 
     fun effacerConversation(id: String) {
-        messages.removeAll { it.avec == id }
-        sauverMessages()
+        retirer { it.avec == id }
     }
 
     fun supprimerContact(id: String) {
@@ -469,10 +692,7 @@ object Reseau {
         sauverCarte("ephemeres") { o -> ephemeres.forEach { (nom, d) -> o.put(nom, d) } }
     }
 
-    fun toutEffacer() {
-        messages.clear()
-        sauverMessages()
-    }
+    fun toutEffacer() = retirer { true }
 
     // Un même numéro peut s'écrire 06..., +33 6... ou 0033 6... : on compare les 9 derniers chiffres.
     fun memeNumero(a: String?, b: String?): Boolean {
@@ -681,6 +901,7 @@ object Reseau {
         val edition = p.edit().putInt("echecs", echecs)
         // Plus de 3 codes faux d'affilée : toutes les conversations sont effacées, sans rien afficher.
         if (echecs > 3) {
+            appContext?.let { Media.nettoyer(it, emptySet()) }
             messages.clear()
             edition.remove("messages")
         }
@@ -797,19 +1018,46 @@ object Reseau {
             .put("numero", monNumero.value)
             .put("cle", Chiffrement.clePublique(context))
 
-    private fun envoyerTcp(adresse: InetAddress, port: Int, contenu: String, surSucces: () -> Unit, surEchec: () -> Unit) {
+    private fun envoyerTcp(
+        adresse: InetAddress, port: Int, contenu: String,
+        surSucces: () -> Unit, surEchec: () -> Unit, piece: ByteArray? = null,
+    ) {
         Thread {
             try {
                 Socket().use { socket ->
                     socket.connect(InetSocketAddress(adresse, port), 5000)
-                    socket.getOutputStream().write((contenu + "\n").toByteArray(Charsets.UTF_8))
-                    socket.getOutputStream().flush()
+                    val sortie = socket.getOutputStream()
+                    sortie.write((contenu + "\n").toByteArray(Charsets.UTF_8))
+                    if (piece != null) sortie.write(piece)
+                    sortie.flush()
                 }
                 surSucces()
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 surEchec()
             }
         }.start()
+    }
+
+    private fun lireLigne(flux: InputStream): String? {
+        val tampon = ByteArrayOutputStream()
+        while (true) {
+            val b = flux.read()
+            if (b < 0 || b == '\n'.code) break
+            tampon.write(b)
+            if (tampon.size() > 400_000) return null
+        }
+        return if (tampon.size() == 0) null else tampon.toString("UTF-8")
+    }
+
+    private fun lireOctets(flux: InputStream, taille: Int): ByteArray? {
+        val tampon = ByteArray(taille)
+        var lus = 0
+        while (lus < taille) {
+            val n = flux.read(tampon, lus, taille - lus)
+            if (n < 0) return null
+            lus += n
+        }
+        return tampon
     }
 
     private fun ecouter(s: ServerSocket) {
@@ -828,7 +1076,8 @@ object Reseau {
             client.use { c ->
                 c.soTimeout = 10000
                 val contexte = appContext ?: return
-                val ligne = BufferedReader(InputStreamReader(c.getInputStream(), Charsets.UTF_8)).readLine() ?: return
+                val flux = BufferedInputStream(c.getInputStream())
+                val ligne = lireLigne(flux) ?: return
                 val json = JSONObject(ligne)
                 val de = json.getString("de")
                 if (de.isBlank() || de == SYSTEME) return
@@ -839,6 +1088,16 @@ object Reseau {
                 if (preuve.isNotEmpty()) {
                     val cleConnue = appareils[de]?.cle ?: return
                     if (Chiffrement.dechiffrer(contexte, cleConnue, preuve) == "lu") principal.post { marquerLusPar(de) }
+                    return
+                }
+                // Photo ou vidéo : l'en-tête annonce la taille, le contenu chiffré suit.
+                val taillePiece = json.optInt("m", 0)
+                if (taillePiece > 0) {
+                    if (taillePiece > Media.MAX_VIDEO + 1024 * 1024) return
+                    val cleConnue = appareils[de]?.cle ?: cle ?: return
+                    val brut = lireOctets(flux, taillePiece) ?: return
+                    val clair = Chiffrement.dechiffrerOctets(contexte, cleConnue, brut) ?: return
+                    principal.post { recevoirMedia(de, clair, cleSiNouveau = cle, numeroSiNouveau = numero) }
                     return
                 }
                 val duree = json.optInt("ttl", 0)
@@ -936,6 +1195,10 @@ object Reseau {
                         id = o.optString("i", "").ifBlank { UUID.randomUUID().toString() },
                         statut = o.optInt("s", Statut.AUCUN),
                         expire = o.optLong("e", 0L),
+                        type = o.optInt("y", 0),
+                        media = o.optString("f", "").ifBlank { null },
+                        cleMedia = o.optString("k", "").ifBlank { null },
+                        vueUnique = o.optBoolean("v", false),
                     )
                 )
             }
@@ -951,6 +1214,7 @@ object Reseau {
                 liste.put(
                     JSONObject().put("a", it.avec).put("d", it.de).put("t", it.texte).put("m", it.moi)
                         .put("h", it.heure).put("i", it.id).put("s", it.statut).put("e", it.expire)
+                        .put("y", it.type).put("f", it.media ?: "").put("k", it.cleMedia ?: "").put("v", it.vueUnique)
                 )
             }
             val protege = Chiffrement.protegerLocal(liste.toString().toByteArray(Charsets.UTF_8))

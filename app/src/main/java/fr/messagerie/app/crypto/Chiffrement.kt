@@ -113,6 +113,38 @@ object Chiffrement {
         return Base64.encodeToString(cipher.iv + chiffre, Base64.NO_WRAP)
     }
 
+    // Même chose pour des données binaires (photos, vidéos) : IV + contenu chiffré.
+    fun chiffrerOctets(context: Context, cleAutre: String, clair: ByteArray): ByteArray {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, cleCommune(context, cleAutre))
+        val chiffre = cipher.doFinal(clair)
+        return cipher.iv + chiffre
+    }
+
+    fun dechiffrerOctets(context: Context, cleAutre: String, brut: ByteArray): ByteArray? = try {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, cleCommune(context, cleAutre), GCMParameterSpec(128, brut, 0, TAILLE_IV))
+        cipher.doFinal(brut, TAILLE_IV, brut.size - TAILLE_IV)
+    } catch (e: Throwable) {
+        null
+    }
+
+    // Chiffrement d'un fichier gardé sur le téléphone, avec une clé propre à ce fichier.
+    fun chiffrerAvecCle(cle: ByteArray, clair: ByteArray): ByteArray {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(cle, "AES"))
+        val chiffre = cipher.doFinal(clair)
+        return cipher.iv + chiffre
+    }
+
+    fun dechiffrerAvecCle(cle: ByteArray, brut: ByteArray): ByteArray? = try {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(cle, "AES"), GCMParameterSpec(128, brut, 0, TAILLE_IV))
+        cipher.doFinal(brut, TAILLE_IV, brut.size - TAILLE_IV)
+    } catch (e: Throwable) {
+        null
+    }
+
     // Retourne null si le déchiffrement échoue (mauvaise clé ou message altéré).
     fun dechiffrer(context: Context, cleAutre: String, codé: String): String? {
         return try {

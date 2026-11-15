@@ -29,7 +29,7 @@ object Sms {
     const val ACTION_ENVOYE = "fr.messagerie.app.SMS_ENVOYE"
     const val ACTION_REMIS = "fr.messagerie.app.SMS_REMIS"
 
-    private fun suivi(context: Context, action: String, idMessage: String): PendingIntent {
+    internal fun suivi(context: Context, action: String, idMessage: String): PendingIntent {
         val intent = Intent(context, SuiviSms::class.java)
             .setAction(action)
             .setData(Uri.parse("messagerie://suivi/$action/$idMessage"))
