@@ -495,6 +495,7 @@ private fun OngletBas(icone: String, libelle: String, actif: Boolean, modifier: 
 @Composable
 private fun LiaisonParCode() {
     var numero by remember { mutableStateOf("") }
+    var codeParSms by remember { mutableStateOf(true) }
     var deplie by remember { mutableStateOf(false) }
     val statut = Reseau.statutLiaison.value
     val entrantes = Reseau.liaisonsEntrantes.keys.toList()
@@ -518,7 +519,7 @@ private fun LiaisonParCode() {
             ) { Icone("cadenas", Accent, 20.dp) }
             Column(modifier = Modifier.weight(1f)) {
                 Text("Lier un contact par code", color = Texte, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                Text("Sans serveur, par SMS", color = TexteDoux, fontSize = 13.sp)
+                Text("Envoie le lien de l'appli et un code, par SMS", color = TexteDoux, fontSize = 13.sp)
             }
             Icone(if (ouvert) "chevronHaut" else "chevron", TexteDoux, 18.dp)
         }
@@ -528,7 +529,17 @@ private fun LiaisonParCode() {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Champ(numero, { numero = it }, "Numéro du contact", Modifier.fillMaxWidth(), fond = Fond, clavier = KeyboardType.Phone)
-                Bouton("Créer un code", modifier = Modifier.fillMaxWidth()) { Reseau.creerLiaison(numero) }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Envoyer le code par SMS", color = Texte, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Aide(
+                            if (codeParSms) "Le plus simple. Moins sûr : qui lit ses SMS voit le code."
+                            else "Le code s'affichera ici : donne-le de vive voix."
+                        )
+                    }
+                    Bascule(codeParSms) { codeParSms = it }
+                }
+                Bouton("Envoyer l'invitation", modifier = Modifier.fillMaxWidth()) { Reseau.creerLiaison(numero, codeParSms) }
                 if (statut.isNotBlank()) {
                     Text(
                         statut,
@@ -551,8 +562,18 @@ private fun LiaisonParCode() {
 @Composable
 private fun LiaisonEntrante(numero: String) {
     var code by remember { mutableStateOf("") }
+    // Code arrivé par SMS : il se remplit tout seul, il ne reste qu'à valider.
+    val recu = Reseau.codeRecu(numero)
+    LaunchedEffect(recu) {
+        if (recu != null && code.isEmpty()) code = recu
+    }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Code reçu de ${Reseau.nomAffiche(numero)}", color = TexteDoux, fontSize = 13.sp)
+        Text(
+            if (recu != null) "${Reseau.nomAffiche(numero)} t'invite. Son code est arrivé par SMS."
+            else "${Reseau.nomAffiche(numero)} t'invite. Saisis le code qu'il t'a donné.",
+            color = Texte,
+            fontSize = 13.sp,
+        )
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Champ(code, { code = it }, "12 chiffres", Modifier.weight(1f), fond = Fond, clavier = KeyboardType.Number)
             Bouton("Valider") { Reseau.validerLiaison(numero, code) }
@@ -731,15 +752,18 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (contact?.cle != null) Icone("cadenas", Accent, 11.dp)
+                // En ligne : le contact a l'appli ouverte sur le même Wi-Fi. Sinon, les messages partent par SMS.
+                val enLigne = contact?.adresse != null
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(if (enLigne) Accent else TexteDoux.copy(alpha = 0.5f)))
                     Text(
                         when {
+                            contact?.cle == null && enLigne -> "En ligne · clé pas encore échangée"
                             contact?.cle == null -> "Clé pas encore échangée"
-                            contact?.adresse != null -> "Chiffré · Wi-Fi local"
-                            else -> "Chiffré · SMS"
+                            enLigne -> "En ligne · chiffré"
+                            else -> "Hors ligne · chiffré, par SMS"
                         },
-                        color = if (contact?.cle != null) TexteDoux else Ephemere,
+                        color = if (contact?.cle == null) Ephemere else if (enLigne) Accent else TexteDoux,
                         fontSize = 12.sp,
                         maxLines = 1,
                     )

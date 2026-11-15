@@ -137,6 +137,7 @@ object Reseau {
         smsAutorise.value = listOf(android.Manifest.permission.SEND_SMS, android.Manifest.permission.RECEIVE_SMS).all {
             contexte.checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED
         }
+        if (smsAutorise.value) releverDemandes()
     }
 
     private var appContext: Context? = null
@@ -190,6 +191,7 @@ object Reseau {
             ?: "${Build.MODEL} ${(1000..9999).random()}".also { p.edit().putString("nom", it).apply() }
         accuses.value = p.getBoolean("accuses", false)
         chargerContacts(p)
+        chargerCodes(p)
         chargerMessages(p)
         chargerCarte(p, "lus") { nom, o -> lus[nom] = o.optLong(nom, 0L) }
         chargerCarte(p, "ephemeres") { nom, o -> ephemeres[nom] = o.optInt(nom, 0) }
@@ -760,7 +762,11 @@ object Reseau {
     val statutLiaison = mutableStateOf("")
     private val liaisonsEnAttente = mutableMapOf<String, Pair<ByteArray, String>>()
 
-    fun creerLiaison(numero: String) {
+    // Codes de liaison reçus par SMS, par numéro : préremplis dans le champ de validation.
+    val codesRecus = mutableStateMapOf<String, String>()
+
+    // Crée une liaison. Trois SMS partent : le lien de téléchargement, le code (si demandé), puis la demande.
+    fun creerLiaison(numero: String, codeParSms: Boolean) {
         val contexte = appContext ?: return
         val propre = numero.filter { it.isDigit() || it == '+' }
         if (propre.length < 6) {
@@ -768,19 +774,65 @@ object Reseau {
             return
         }
         val code = Appairage.nouveauCode()
-        if (!Sms.envoyerTexte(propre, Sms.PREFIXE_P1 + Chiffrement.clePublique(contexte))) {
+        val moi = monNumero.value.ifBlank { "Quelqu'un" }
+        if (!Sms.inviter(propre, "$moi t'invite sur Messagerie. Télécharge l'appli ici : $LIEN_TELECHARGEMENT")) {
             statutLiaison.value = "SMS non envoyé. Autorise les SMS pour Messagerie dans les paramètres du téléphone."
             return
         }
+        if (codeParSms) Sms.envoyerTexte(propre, Sms.PREFIXE_CODE + Appairage.formater(code) + " (code de liaison Messagerie)")
+        Sms.envoyerTexte(propre, Sms.PREFIXE_P1 + Chiffrement.clePublique(contexte))
         codesSortants[propre] = code
-        statutLiaison.value = "Donne ce code à la personne, de vive voix : ${Appairage.formater(code)}\nGarde l'appli ouverte jusqu'à la confirmation."
+        sauverCodes()
+        statutLiaison.value =
+            if (codeParSms) "Lien de téléchargement et code envoyés par SMS. La liaison se fera dès que la personne aura validé dans l'appli."
+            else "Lien de téléchargement envoyé. Donne ce code à la personne, de vive voix : ${Appairage.formater(code)}"
     }
 
     fun recevoirP1(expediteur: String, pubA: String) {
         surPrincipal {
-            liaisonsEntrantes[expediteur] = pubA
-            statutLiaison.value = "Une personne demande à se lier. Saisis le code qu'elle t'a donné."
-            notifier()
+            // Une demande déjà validée ne réapparaît pas.
+            if (pubA !in liaisonsTraitees()) {
+                liaisonsEntrantes[expediteur] = pubA
+                statutLiaison.value = "Une personne demande à se lier. Valide son code ci-dessous."
+                notifier()
+            }
+        }
+    }
+
+    fun recevoirCodeLiaison(expediteur: String, texte: String) {
+        val code = texte.filter { it.isDigit() }.take(12)
+        if (code.length == 12) surPrincipal { codesRecus[expediteur] = code }
+    }
+
+    // Code reçu par SMS pour ce numéro, s'il y en a un.
+    fun codeRecu(numero: String): String? = codesRecus.entries.firstOrNull { memeNumero(it.key, numero) }?.value
+
+    private fun liaisonsTraitees(): Set<String> = prefs?.getStringSet("liaisonsTraitees", emptySet()) ?: emptySet()
+
+    // Les codes créés survivent à la fermeture de l'appli : la réponse peut arriver des heures plus tard.
+    private fun sauverCodes() {
+        try {
+            val o = JSONObject()
+            codesSortants.forEach { (numero, code) -> o.put(numero, code) }
+            prefs?.edit()?.putString("codes", Chiffrement.protegerLocal(o.toString().toByteArray(Charsets.UTF_8)))?.apply()
+        } catch (e: Exception) { }
+    }
+
+    private fun chargerCodes(p: SharedPreferences) {
+        try {
+            val o = JSONObject(String(Chiffrement.ouvrirLocal(p.getString("codes", null) ?: return), Charsets.UTF_8))
+            o.keys().forEach { numero -> codesSortants[numero] = o.getString(numero) }
+        } catch (e: Exception) { }
+    }
+
+    // Demandes de liaison arrivées par SMS avant l'installation ou appli fermée.
+    fun releverDemandes() {
+        val contexte = appContext ?: return
+        Sms.releverBoite(contexte).forEach { (adresse, corps) ->
+            when {
+                corps.startsWith(Sms.PREFIXE_CODE) -> recevoirCodeLiaison(adresse, corps.removePrefix(Sms.PREFIXE_CODE))
+                corps.startsWith(Sms.PREFIXE_P1) -> recevoirP1(adresse, corps.removePrefix(Sms.PREFIXE_P1))
+            }
         }
     }
 
@@ -801,6 +853,9 @@ object Reseau {
         // Le contact n'est ajouté qu'une fois la confirmation reçue : un mauvais code ne laisse aucune clé.
         liaisonsEnAttente[numero] = k to pubA
         liaisonsEntrantes.remove(numero)
+        // Le code a servi : il est effacé de l'appli, et la demande ne sera plus proposée.
+        codesRecus.keys.filter { memeNumero(it, numero) }.forEach { codesRecus.remove(it) }
+        prefs?.let { p -> p.edit().putStringSet("liaisonsTraitees", (liaisonsTraitees() + pubA).toList().takeLast(50).toSet()).apply() }
         statutLiaison.value = "Réponse envoyée. Garde l'appli ouverte : la liaison sera confirmée dans un instant."
     }
 
@@ -813,6 +868,7 @@ object Reseau {
         val confirmation = Appairage.verifierEtConfirmer(codesSortants[cleCode] ?: return, pubA, morceaux[0], morceaux[1])
         surPrincipal {
             codesSortants.remove(cleCode)
+            sauverCodes()
             if (confirmation == null) {
                 statutLiaison.value = "Code incorrect : la liaison n'a pas été faite. Crée un nouveau code."
             } else {

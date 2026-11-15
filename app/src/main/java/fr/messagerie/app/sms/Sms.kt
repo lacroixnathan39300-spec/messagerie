@@ -25,6 +25,8 @@ object Sms {
     const val PREFIXE_P1 = "RG1P1:"
     const val PREFIXE_P2 = "RG1P2:"
     const val PREFIXE_P3 = "RG1P3:"
+    // Code de liaison envoyé par SMS (au choix de l'expéditeur, à la place de la vive voix).
+    const val PREFIXE_CODE = "RG1C:"
 
     const val ACTION_ENVOYE = "fr.messagerie.app.SMS_ENVOYE"
     const val ACTION_REMIS = "fr.messagerie.app.SMS_REMIS"
@@ -61,6 +63,35 @@ object Sms {
 
     fun envoyerTexte(numero: String, texte: String): Boolean = expedier(numero, texte)
 
+    // Demandes de liaison arrivées avant l'installation de l'appli : on les retrouve dans les SMS
+    // reçus depuis 7 jours. Renvoie (numéro, texte), dans l'ordre d'arrivée, une seule fois chacun.
+    fun releverBoite(context: Context): List<Pair<String, String>> {
+        val trouves = ArrayList<Pair<String, String>>()
+        try {
+            val prefs = context.getSharedPreferences("sms", Context.MODE_PRIVATE)
+            var vu = prefs.getLong("vu", -1L)
+            val depuis = System.currentTimeMillis() - 7L * 86_400_000L
+            context.contentResolver.query(
+                Uri.parse("content://sms/inbox"),
+                arrayOf("_id", "address", "body"),
+                "_id > ? AND date > ? AND (body LIKE 'RG1P1:%' OR body LIKE 'RG1C:%')",
+                arrayOf(vu.toString(), depuis.toString()),
+                "_id ASC",
+            )?.use { c ->
+                while (c.moveToNext()) {
+                    vu = c.getLong(0)
+                    val adresse = c.getString(1) ?: continue
+                    val corps = c.getString(2) ?: continue
+                    trouves.add(adresse to corps)
+                }
+            } ?: return trouves
+            prefs.edit().putLong("vu", vu).apply()
+        } catch (e: Throwable) {
+            // Lecture des SMS refusée : rien à relever.
+        }
+        return trouves
+    }
+
     // Invitation en clair à installer l'appli, pour un contact qui ne l'a pas encore.
     fun inviter(numero: String, texte: String): Boolean = expedier(numero, texte)
 
@@ -88,6 +119,7 @@ class RecepteurSms : BroadcastReceiver() {
                 when {
                     corps.startsWith(Sms.PREFIXE_CLE) -> Reseau.recevoirCle(expediteur, corps.removePrefix(Sms.PREFIXE_CLE))
                     corps.startsWith(Sms.PREFIXE_LU) -> Reseau.recevoirLu(expediteur, corps.removePrefix(Sms.PREFIXE_LU))
+                    corps.startsWith(Sms.PREFIXE_CODE) -> Reseau.recevoirCodeLiaison(expediteur, corps.removePrefix(Sms.PREFIXE_CODE))
                     corps.startsWith(Sms.PREFIXE_P1) -> Reseau.recevoirP1(expediteur, corps.removePrefix(Sms.PREFIXE_P1))
                     corps.startsWith(Sms.PREFIXE_P2) -> Reseau.recevoirP2(expediteur, corps.removePrefix(Sms.PREFIXE_P2))
                     corps.startsWith(Sms.PREFIXE_P3) -> Reseau.recevoirP3(expediteur, corps.removePrefix(Sms.PREFIXE_P3))
