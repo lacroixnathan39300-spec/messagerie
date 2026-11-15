@@ -45,6 +45,8 @@ Le client essaie 1, puis 2, puis 3, puis 4. Le choix est invisible pour l'utilis
 - Pas de numéro de téléphone.
 - Identifiants de destinataire **tournants** pour que les relais ne puissent pas les relier entre eux.
 - Clé publique partagée par QR code ou lien.
+- **Option : numéro de téléphone.** Sert seulement à retrouver ses contacts. Le numéro n'est jamais affiché ni stocké en clair : on compare des empreintes chiffrées. Désactivé par défaut.
+- **Mode codé (affichage uniquement).** Transforme le texte affiché (ex. « sa va » → « fk dv ») pour les lecteurs occasionnels. Ce n'est pas une sécurité : un chiffrement par substitution se casse en quelques minutes. Le vrai chiffrement reste celui du protocole, en dessous.
 
 ## 7. Décisions
 - **Messagerie à part, en première application** : elle reste une appli autonome. Un hub regroupant plusieurs applis viendra ensuite.
