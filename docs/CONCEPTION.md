@@ -36,6 +36,10 @@ Le client essaie 1, puis 2, puis 3, puis 4. Le choix est invisible pour l'utilis
 - Couche oignon : X25519 + ChaCha20-Poly1305 par saut.
 - Clés stockées dans le Keystore Android.
 
+- **Appairage au début** : quand deux personnes s'ajoutent, leurs téléphones créent ensemble une clé de chiffrement commune. Elle est établie une seule fois, au premier contact.
+- Pour vérifier, chaque téléphone affiche le même **code de sécurité** (ex. 6 chiffres ou 4 mots). Si les deux codes correspondent, personne ne s'est glissé entre vous.
+- Une fois appairés, les messages sont chiffrés avec cette clé, qui se renouvelle en continu (protocole Signal).
+
 ## 5. Éphémère
 - Durée de vie réglable par message (ex. 1 h, 24 h, après lecture, vue unique).
 - Accusé de réception chiffré : déclenche l'effacement sur les deux téléphones.
