@@ -142,7 +142,7 @@ object Reseau {
     fun ouvrirNumero(saisie: String): String? {
         val propre = saisie.filter { it.isDigit() || it == '+' }
         if (propre.length < 6) return null
-        if (appareils.values.none { it.numero == propre }) {
+        if (appareils.values.none { memeNumero(it.numero, propre) }) {
             appareils[propre] = Appareil(propre, null, 0, propre, null)
         }
         return propre
@@ -176,9 +176,17 @@ object Reseau {
         }
     }
 
+    // Un même numéro peut s'écrire 06..., +33 6... ou 0033 6... : on compare les 9 derniers chiffres.
+    fun memeNumero(a: String?, b: String?): Boolean {
+        if (a == null || b == null) return false
+        val x = a.filter { it.isDigit() }.takeLast(9)
+        val y = b.filter { it.isDigit() }.takeLast(9)
+        return x.length == 9 && x == y
+    }
+
     // Appelé par le récepteur de SMS : le numéro de l'expéditeur doit être un contact connu.
     fun recevoirSms(context: Context, expediteur: String, charge: String) {
-        val contact = appareils.values.firstOrNull { it.numero == expediteur && it.cle != null } ?: return
+        val contact = appareils.values.firstOrNull { memeNumero(it.numero, expediteur) && it.cle != null } ?: return
         val clair = Chiffrement.dechiffrer(context, contact.cle!!, charge) ?: return
         try {
             val json = JSONObject(clair)
