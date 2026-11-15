@@ -1,0 +1,10 @@
+{
+  "applis": [
+    {
+      "nom": "Messagerie",
+      "description": "Messagerie chiffrée, sans serveur. Wi-Fi local et SMS.",
+      "paquet": "fr.messagerie.app",
+      "apk": "https://github.com/lacroixnathan39300-spec/messagerie/releases/latest/download/Messagerie.apk"
+    }
+  ]
+}
