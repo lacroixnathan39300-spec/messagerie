@@ -267,13 +267,22 @@ private fun LigneAppareil(a: Appareil, onClick: () -> Unit) {
 }
 
 @Composable
+// Fausse conversation affichée avec le code leurre : rien de réel, aucune saisie possible.
+private val LEURRE = listOf(
+    Message("", "Moi", "Tu passes à la boulangerie ?", moi = true),
+    Message("", "Moi", "Ok, je prends du pain complet.", moi = false),
+    Message("", "Moi", "Merci, à ce soir.", moi = true),
+)
+
+@Composable
 private fun Conversation(nom: String, onRetour: () -> Unit) {
     var saisie by remember { mutableStateOf("") }
     // Verrouillée à chaque ouverture : les messages restent masqués tant que le code n'est pas saisi.
-    var deverrouillee by remember { mutableStateOf(false) }
+    // "verrouillee", "reelle" (vrais messages) ou "leurre" (fausse conversation).
+    var mode by remember { mutableStateOf("verrouillee") }
     var codeSaisi by remember { mutableStateOf("") }
     var codeFaux by remember { mutableStateOf(false) }
-    val fil = Reseau.messages.filter { it.avec == nom }
+    val fil = if (mode == "leurre") LEURRE else Reseau.messages.filter { it.avec == nom }
 
     Column(modifier = Modifier.fillMaxSize().background(Fond).statusBarsPadding().navigationBarsPadding()) {
         Row(
@@ -296,7 +305,7 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
                 Puce("Envoyer ma clé", Accent, modifier = Modifier.clickable { Reseau.envoyerCle(nom) })
             }
         }
-        if (!deverrouillee) {
+        if (mode == "verrouillee") {
             Column(
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(20.dp),
                 verticalArrangement = Arrangement.Center,
@@ -326,7 +335,10 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
                     Spacer(Modifier.height(10.dp))
                     Puce("Déverrouiller", Accent, modifier = Modifier.clickable {
                         if (Reseau.verifierCode(codeSaisi)) {
-                            deverrouillee = true
+                            mode = "reelle"
+                            codeSaisi = ""
+                        } else if (Reseau.verifierLeurre(codeSaisi)) {
+                            mode = "leurre"
                             codeSaisi = ""
                         } else {
                             codeFaux = true
@@ -343,7 +355,7 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
                 items(fil) { m -> Bulle(m) }
             }
         }
-        if (deverrouillee) Row(
+        if (mode == "reelle") Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -417,6 +429,33 @@ private fun Reglages(onRetour: () -> Unit) {
             if (codeNouveau.length >= 4) {
                 Reseau.definirCode(codeNouveau)
                 codeNouveau = ""
+            }
+        })
+        Spacer(Modifier.height(12.dp))
+        var leurreNouveau by remember { mutableStateOf("") }
+        Text("Code leurre (ouvre une fausse conversation)", color = TexteDoux, fontSize = 13.sp)
+        Spacer(Modifier.height(6.dp))
+        TextField(
+            value = leurreNouveau,
+            onValueChange = { leurreNouveau = it.filter { c -> c.isDigit() }.take(8) },
+            placeholder = { Text("4 à 8 chiffres, différent du code", color = TexteDoux) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Surface,
+                unfocusedContainerColor = Surface,
+                focusedTextColor = Texte,
+                unfocusedTextColor = Texte,
+                cursorColor = Accent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+            ),
+        )
+        Spacer(Modifier.height(6.dp))
+        Puce(if (Reseau.leurreDefini()) "Changer le leurre" else "Définir le leurre", Ephemere, modifier = Modifier.clickable {
+            if (leurreNouveau.length >= 4) {
+                Reseau.definirLeurre(leurreNouveau)
+                leurreNouveau = ""
             }
         })
         Spacer(Modifier.height(16.dp))

@@ -449,6 +449,25 @@ object Reseau {
         return MessageDigest.isEqual(hacher(saisie, sel), attendu)
     }
 
+    // Code leurre : ouvre une fausse conversation, sans rien révéler des vraies. Stocké comme le code d'accès.
+    fun leurreDefini(): Boolean = prefs?.contains("leurreHash") == true
+
+    fun definirLeurre(code: String) {
+        val p = prefs ?: return
+        val sel = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        p.edit()
+            .putString("leurreSel", android.util.Base64.encodeToString(sel, android.util.Base64.NO_WRAP))
+            .putString("leurreHash", android.util.Base64.encodeToString(hacher(code, sel), android.util.Base64.NO_WRAP))
+            .apply()
+    }
+
+    fun verifierLeurre(saisie: String): Boolean {
+        val p = prefs ?: return false
+        val sel = android.util.Base64.decode(p.getString("leurreSel", null) ?: return false, android.util.Base64.NO_WRAP)
+        val attendu = android.util.Base64.decode(p.getString("leurreHash", null) ?: return false, android.util.Base64.NO_WRAP)
+        return MessageDigest.isEqual(hacher(saisie, sel), attendu)
+    }
+
     private fun hacher(code: String, sel: ByteArray): ByteArray {
         val fabrique = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         return fabrique.generateSecret(PBEKeySpec(code.toCharArray(), sel, 200000, 256)).encoded
