@@ -295,6 +295,8 @@ object Reseau {
     }
 
     const val LIEN_TELECHARGEMENT = "https://github.com/lacroixnathan39300-spec/messagerie/releases/latest/download/Messagerie.apk"
+    // Les invitations envoient le hub « Mes applis » : on l'installe une fois, puis on y prend Messagerie.
+    const val LIEN_HUB = "https://github.com/lacroixnathan39300-spec/messagerie/releases/latest/download/MesApplis.apk"
 
     // Ouvre une discussion avec un numéro. Renvoie l'identifiant du contact (existant ou créé).
     fun ouvrirNumero(saisie: String): String? {
@@ -380,7 +382,7 @@ object Reseau {
                 majStatut(m.id, Statut.ATTENTE)
                 if (invites.add(id)) {
                     val expediteur = monNumero.value.ifBlank { "Quelqu'un" }
-                    val parti = Sms.inviter(numero, "$expediteur t'écrit sur Messagerie. Installe l'appli pour lire ses messages : $LIEN_TELECHARGEMENT")
+                    val parti = Sms.inviter(numero, "$expediteur t'écrit sur Messagerie. Installe « Mes applis » pour lire ses messages, tu y trouveras Messagerie : $LIEN_HUB")
                     note(
                         id,
                         if (parti) "Invitation envoyée par SMS. Tes messages partiront tout seuls dès que la clé sera échangée."
@@ -775,7 +777,7 @@ object Reseau {
         }
         val code = Appairage.nouveauCode()
         val moi = monNumero.value.ifBlank { "Quelqu'un" }
-        if (!Sms.inviter(propre, "$moi t'invite sur Messagerie. Télécharge l'appli ici : $LIEN_TELECHARGEMENT")) {
+        if (!Sms.inviter(propre, "$moi t'invite sur Messagerie. Installe « Mes applis » ici, Messagerie est dedans : $LIEN_HUB")) {
             statutLiaison.value = "SMS non envoyé. Autorise les SMS pour Messagerie dans les paramètres du téléphone."
             return
         }
