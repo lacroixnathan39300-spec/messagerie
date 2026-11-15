@@ -104,23 +104,12 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
     fun ouvrirSaisie() {
         val propre = saisie.trim()
         if (propre.isEmpty()) return
-        if (propre.any { it.isLetter() }) {
-            Reseau.ouvrirPseudo(propre) { trouve ->
-                if (trouve != null) {
-                    saisie = ""
-                    onOuvrir(trouve)
-                } else {
-                    erreur = true
-                }
-            }
+        val ouvert = Reseau.ouvrirNumero(propre)
+        if (ouvert != null) {
+            saisie = ""
+            onOuvrir(ouvert)
         } else {
-            val ouvert = Reseau.ouvrirNumero(propre)
-            if (ouvert != null) {
-                saisie = ""
-                onOuvrir(ouvert)
-            } else {
-                erreur = true
-            }
+            erreur = true
         }
     }
 
@@ -154,9 +143,10 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
                     Champ(
                         valeur = saisie,
                         surChangement = { saisie = it; erreur = false },
-                        indication = "Pseudo ou numéro",
+                        indication = "Numéro de téléphone",
                         modifier = Modifier.weight(1f),
                         fond = Color.Transparent,
+                        clavier = KeyboardType.Phone,
                     )
                     Box(
                         modifier = Modifier
@@ -171,7 +161,7 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
                 }
                 if (erreur) {
                     Text(
-                        "Introuvable. Vérifie le pseudo ou le numéro.",
+                        "Numéro invalide.",
                         color = Danger,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(horizontal = 24.dp),
@@ -222,7 +212,7 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
                         ) { Icone("bulle", TexteDoux, 32.dp) }
                         Text("Aucune discussion", color = Texte, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Saisis un pseudo ou un numéro ci-dessus, ou ouvre l'appli sur un autre téléphone du même Wi-Fi.",
+                            "Saisis un numéro ci-dessus, ou ouvre l'appli sur un autre téléphone du même Wi-Fi.",
                             color = TexteDoux,
                             fontSize = 14.sp,
                             lineHeight = 20.sp,
@@ -656,7 +646,6 @@ private fun Bulle(m: Message) {
 
 @Composable
 private fun Reglages(onRetour: () -> Unit) {
-    var pseudoSaisi by remember { mutableStateOf(Reseau.monPseudo.value) }
     var numeroSaisi by remember { mutableStateOf(Reseau.monNumero.value) }
     var codeNouveau by remember { mutableStateOf("") }
     var leurreNouveau by remember { mutableStateOf("") }
@@ -699,26 +688,21 @@ private fun Reglages(onRetour: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                val pseudo = Reseau.monPseudo.value
-                Avatar(pseudo.ifBlank { "?" }, Accent, 60.dp)
+                Box(
+                    modifier = Modifier.size(60.dp).clip(CircleShape).background(Accent.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) { Icone("cadenas", Accent, 28.dp) }
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(
-                        pseudo.ifBlank { "Sans pseudo" },
+                        Reseau.monNumero.value.ifBlank { "Numéro non renseigné" },
                         color = Texte,
                         fontSize = 19.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text(Reseau.monNumero.value.ifBlank { "Numéro non renseigné" }, color = TexteDoux, fontSize = 14.sp)
+                    Text("Aucun passage par internet", color = TexteDoux, fontSize = 14.sp)
                 }
-            }
-
-            SectionReglage("Profil", "bulle") {
-                Champ(pseudoSaisi, { pseudoSaisi = it }, "Pseudo, ex. camille_42", Modifier.fillMaxWidth(), fond = Fond)
-                Bouton("Enregistrer le pseudo", modifier = Modifier.fillMaxWidth()) { Reseau.inscrirePseudo(pseudoSaisi) }
-                if (Reseau.statutPseudo.value.isNotBlank()) Aide(Reseau.statutPseudo.value, Ephemere)
-                Aide("Sert à te trouver sans donner ton numéro. Demande une connexion internet.")
             }
 
             SectionReglage("Code d'accès", "cadenas") {
@@ -819,13 +803,6 @@ private fun Reglages(onRetour: () -> Unit) {
                 LigneEtat("SMS", "Chiffré", Accent, "Fonctionne sans internet")
                 Box(Modifier.fillMaxWidth().height(1.dp).background(Separateur))
                 LigneEtat("Wi-Fi local", "Partiel", Ephemere, "Chiffré dès que la clé du contact est connue")
-                Box(Modifier.fillMaxWidth().height(1.dp).background(Separateur))
-                LigneEtat(
-                    "Relais internet",
-                    if (Reseau.monPseudo.value.isBlank()) "Pseudo requis" else "Chiffré",
-                    if (Reseau.monPseudo.value.isBlank()) TexteDoux else Accent,
-                    "Interrogé seulement quand l'appli est ouverte",
-                )
             }
 
             Text(

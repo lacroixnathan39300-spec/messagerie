@@ -70,3 +70,8 @@ Le client essaie 1, puis 2, puis 3, puis 4. Le choix est invisible pour l'utilis
 - **Dépend d'un serveur** : seulement la recherche par pseudo et l'envoi par internet. Ce relais est optionnel.
 - **Batterie** : le relais n'est interrogé que quand l'appli est ouverte. En arrière-plan, aucun appel réseau.
 - **Suite prévue** : annuaire et boîtes de messages réparties entre téléphones volontaires (table de hachage distribuée), pour se passer du serveur. Risques : disponibilité (téléphones éteints), spam par faux téléphones, premier contact à amorcer.
+
+## 10. Décision : aucun passage par internet
+- Le relais internet et la recherche par pseudo sont retirés (code, serveur et déploiement supprimés).
+- Transports restants : Wi-Fi local et SMS. L'appli ne contacte aucun serveur.
+- L'identité est le numéro de téléphone. Les sections 2 à 4 ci-dessus (direct internet, oignon, serveur de secours) ne sont plus d'actualité.
