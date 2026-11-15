@@ -64,3 +64,9 @@ Le client essaie 1, puis 2, puis 3, puis 4. Le choix est invisible pour l'utilis
 3. Éphémères et vue unique.
 4. Mode local (mode 1).
 5. Relais oignon (mode 3), après test sur plusieurs téléphones.
+
+## 9. Indépendance du serveur (état et suite)
+- **Sans serveur aujourd'hui** : Wi-Fi local (découverte et envoi sur le réseau du foyer) et SMS (réseau de l'opérateur, clés échangées par SMS).
+- **Dépend d'un serveur** : seulement la recherche par pseudo et l'envoi par internet. Ce relais est optionnel.
+- **Batterie** : le relais n'est interrogé que quand l'appli est ouverte. En arrière-plan, aucun appel réseau.
+- **Suite prévue** : annuaire et boîtes de messages réparties entre téléphones volontaires (table de hachage distribuée), pour se passer du serveur. Risques : disponibilité (téléphones éteints), spam par faux téléphones, premier contact à amorcer.
