@@ -19,6 +19,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        Reseau.surPremierPlan(true)
+    }
+
+    override fun onStop() {
+        Reseau.surPremierPlan(false)
+        super.onStop()
+    }
+
     override fun onDestroy() {
         if (isFinishing) Reseau.arreter()
         super.onDestroy()

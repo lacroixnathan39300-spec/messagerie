@@ -61,6 +61,13 @@ object Reseau {
     // Message affiché sous le champ pseudo dans les réglages.
     val statutPseudo = mutableStateOf("")
 
+    private var premierPlan = false
+
+    // Appelé par l'activité à l'ouverture et à la fermeture de l'appli.
+    fun surPremierPlan(actif: Boolean) {
+        premierPlan = actif
+    }
+
     private var boiteMoi: String? = null
     private var jetonMoi: String? = null
 
@@ -82,11 +89,14 @@ object Reseau {
         monPseudo.value = p.getString("pseudo", "") ?: ""
         boiteMoi = p.getString("boite", null) ?: Relais.aleatoire(16).also { p.edit().putString("boite", it).apply() }
         jetonMoi = p.getString("jeton", null) ?: Relais.aleatoire(32).also { p.edit().putString("jeton", it).apply() }
-        // Relève les messages venus par internet, toutes les 15 secondes.
+        // Relève les messages venus par internet, seulement quand l'appli est ouverte et qu'un pseudo existe.
+        // En arrière-plan, rien n'est interrogé : Wi-Fi et SMS restent actifs, et la batterie est préservée.
         Thread {
             while (true) {
-                try { recevoirRelais() } catch (e: Exception) { }
-                Thread.sleep(15000)
+                try {
+                    if (premierPlan && monPseudo.value.isNotBlank()) recevoirRelais()
+                } catch (e: Exception) { }
+                Thread.sleep(20000)
             }
         }.start()
 
