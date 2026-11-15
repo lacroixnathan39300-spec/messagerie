@@ -14,18 +14,18 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Compilation APK debug (non signée pour la clé de production)
+      - name: Compilation APK release (signée avec la clé stable du dépôt)
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug --no-daemon
+          ./gradlew :app:assembleRelease --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: messagerie-debug
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/release/*.apk
       - name: Publication de l'APK en release GitHub
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="test-${{ github.run_number }}"
-          cp app/build/outputs/apk/debug/app-debug.apk Messagerie.apk
-          gh release create "$TAG" Messagerie.apk --title "Messagerie test ${{ github.run_number }}" --notes "APK de test (non signée pour la production)." --latest || gh release upload "$TAG" Messagerie.apk --clobber
+          cp app/build/outputs/apk/release/app-release.apk Messagerie.apk
+          gh release create "$TAG" Messagerie.apk --title "Messagerie test ${{ github.run_number }}" --notes "APK signée (clé stable)." --latest || gh release upload "$TAG" Messagerie.apk --clobber

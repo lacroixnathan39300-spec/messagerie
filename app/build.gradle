@@ -15,13 +15,23 @@ android {
         versionCode 1
         versionName '1.0'
     }
+    signingConfigs {
+        // Clé stable : les nouvelles versions s'installent par-dessus l'ancienne sans effacer les données.
+        // La clé est dans le dépôt (pas un secret) : elle sert à la continuité, pas à prouver l'auteur.
+        release {
+            storeFile file('clef.jks')
+            storePassword 'messagerie2026'
+            keyAlias 'messagerie'
+            keyPassword 'messagerie2026'
+        }
+    }
     buildFeatures { compose true }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = '17' }
     buildTypes {
         release {
             minifyEnabled false
-            // Ne jamais publier une version non signée : la clé de signature sera fournie par la CI.
+            signingConfig signingConfigs.release
         }
     }
 }
