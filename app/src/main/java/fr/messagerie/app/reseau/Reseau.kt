@@ -141,7 +141,7 @@ object Reseau {
         prefs?.edit()?.putString("numero", monNumero.value)?.apply()
     }
 
-    const val LIEN_TELECHARGEMENT = "https://github.com/lacroixnathan39300-spec/messagerie/releases"
+    const val LIEN_TELECHARGEMENT = "https://github.com/lacroixnathan39300-spec/messagerie/releases/latest/download/Messagerie.apk"
 
     // Ouvre une discussion avec un numéro qui n'est pas encore dans la liste.
     fun ouvrirNumero(saisie: String): String? {
