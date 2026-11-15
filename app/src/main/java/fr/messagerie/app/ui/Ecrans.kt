@@ -1,6 +1,8 @@
 package fr.messagerie.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -50,6 +53,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -60,6 +65,10 @@ import androidx.compose.ui.unit.sp
 import fr.messagerie.app.reseau.Appareil
 import fr.messagerie.app.reseau.Message
 import fr.messagerie.app.reseau.Reseau
+import fr.messagerie.app.reseau.Statut
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.random.Random
 import kotlinx.coroutines.delay
 
@@ -68,24 +77,152 @@ private val couleursContacts = listOf(Accent, Color(0xFF7AA7FF), Ephemere, Color
 private fun couleurDe(nom: String): Color =
     couleursContacts[(nom.hashCode() and Int.MAX_VALUE) % couleursContacts.size]
 
+private fun heureCourte(t: Long): String = SimpleDateFormat("HH:mm", Locale.FRANCE).format(Date(t))
+
+private fun memeJour(a: Long, b: Long): Boolean {
+    val f = SimpleDateFormat("yyyyMMdd", Locale.FRANCE)
+    return f.format(Date(a)) == f.format(Date(b))
+}
+
+private fun jourLisible(t: Long): String {
+    val maintenant = System.currentTimeMillis()
+    return when {
+        memeJour(t, maintenant) -> "Aujourd'hui"
+        memeJour(t, maintenant - 86_400_000L) -> "Hier"
+        else -> SimpleDateFormat("d MMMM yyyy", Locale.FRANCE).format(Date(t))
+    }
+}
+
+// Heure si c'est aujourd'hui, sinon la date courte.
+private fun momentCourt(t: Long): String =
+    if (memeJour(t, System.currentTimeMillis())) heureCourte(t) else SimpleDateFormat("d MMM", Locale.FRANCE).format(Date(t))
+
+private fun dureeEphemere(secondes: Int): String = when {
+    secondes <= 0 -> "Désactivés"
+    secondes < 3600 -> "${secondes / 60} min"
+    secondes < 86400 -> "${secondes / 3600} h"
+    else -> "${secondes / 86400} j"
+}
+
 @Composable
 fun MessagerieApp() {
     var ecran by remember { mutableStateOf("discussions") }
     var appareilOuvert by remember { mutableStateOf<String?>(null) }
+    var pret by remember { mutableStateOf(Reseau.codeDefini()) }
 
     MessagerieTheme {
-        val ouvert = appareilOuvert
-        when {
-            ecran == "reglages" -> Reglages(onRetour = { ecran = "discussions" })
-            ouvert != null -> Conversation(
-                nom = ouvert,
-                onRetour = { appareilOuvert = null },
-                onReglages = { appareilOuvert = null; ecran = "reglages" },
+        if (!pret) {
+            Bienvenue(onFini = { pret = true })
+        } else {
+            val ouvert = appareilOuvert
+            val cible = when {
+                ecran == "reglages" -> "reglages"
+                ouvert != null -> "c:$ouvert"
+                else -> "liste"
+            }
+            // Le bouton retour du téléphone revient à la liste au lieu de quitter l'appli.
+            BackHandler(enabled = cible != "liste") {
+                if (ecran == "reglages") ecran = "discussions" else appareilOuvert = null
+            }
+            Crossfade(targetState = cible, label = "ecran") { c ->
+                when {
+                    c == "reglages" -> Reglages(onRetour = { ecran = "discussions" })
+                    c.startsWith("c:") -> Conversation(
+                        nom = c.removePrefix("c:"),
+                        onRetour = { appareilOuvert = null },
+                    )
+                    else -> ListeDiscussions(
+                        onOuvrir = { appareilOuvert = it },
+                        onReglages = { ecran = "reglages" },
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Bienvenue (premier lancement)
+// ---------------------------------------------------------------------------------------------
+
+@Composable
+private fun Bienvenue(onFini: () -> Unit) {
+    var numero by remember { mutableStateOf(Reseau.monNumero.value) }
+    var code by remember { mutableStateOf("") }
+    var erreur by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Fond)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 28.dp, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(92.dp)
+                .clip(CircleShape)
+                .background(Accent.copy(alpha = 0.12f))
+                .border(1.dp, Accent.copy(alpha = 0.35f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) { Icone("cadenas", Accent, 42.dp) }
+        Spacer(Modifier.height(22.dp))
+        Text("Messagerie", color = Texte, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Tes messages, chiffrés, sans internet.",
+            color = TexteDoux,
+            fontSize = 15.sp,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(28.dp))
+        Column(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Surface).padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Atout("cadenas", "Chiffré de bout en bout", "Par SMS et sur le Wi-Fi local")
+            Atout("valider", "Un code pour chaque ouverture", "Sans lui, les messages restent masqués")
+            Atout("bulle", "Aucun serveur, aucun compte", "Tout reste sur ton téléphone")
+        }
+        Spacer(Modifier.height(24.dp))
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Champ(numero, { numero = it }, "Ton numéro de téléphone", Modifier.fillMaxWidth(), clavier = KeyboardType.Phone)
+            Champ(
+                code,
+                { code = it.filter { c -> c.isDigit() }.take(8); erreur = "" },
+                "Choisis un code (4 à 8 chiffres)",
+                Modifier.fillMaxWidth(),
+                clavier = KeyboardType.NumberPassword,
             )
-            else -> ListeDiscussions(
-                onOuvrir = { appareilOuvert = it },
-                onReglages = { ecran = "reglages" },
-            )
+            if (erreur.isNotEmpty()) Aide(erreur, Danger)
+            Bouton("Commencer", modifier = Modifier.fillMaxWidth()) {
+                if (code.length < 4) {
+                    erreur = "Le code doit faire au moins 4 chiffres."
+                } else {
+                    if (numero.isNotBlank()) Reseau.enregistrerNumero(numero)
+                    Reseau.definirCode(code)
+                    onFini()
+                }
+            }
+            Aide("Retiens bien ton code : il n'existe aucun moyen de le récupérer.")
+        }
+    }
+}
+
+@Composable
+private fun Atout(icone: String, titre: String, detail: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Box(
+            modifier = Modifier.size(40.dp).clip(CircleShape).background(Accent.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) { Icone(icone, Accent, 19.dp) }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(titre, color = Texte, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(detail, color = TexteDoux, fontSize = 13.sp)
         }
     }
 }
@@ -96,7 +233,11 @@ fun MessagerieApp() {
 
 @Composable
 private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit) {
-    val appareils = Reseau.appareils.values.filter { it.accepte }.sortedBy { Reseau.nomAffiche(it.nom).lowercase() }
+    // Les discussions les plus récentes en premier, puis l'ordre alphabétique.
+    val appareils = Reseau.appareils.values.filter { it.accepte }
+        .sortedBy { Reseau.nomAffiche(it.nom).lowercase() }
+        .sortedByDescending { a -> Reseau.messages.lastOrNull { it.avec == a.nom }?.heure ?: 0L }
+    val enAttente = appareils.sumOf { Reseau.nonLus(it.nom) }
     val demandes = Reseau.appareils.values.filter { !it.accepte }
     var saisie by remember { mutableStateOf("") }
     var erreur by remember { mutableStateOf(false) }
@@ -122,8 +263,13 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Box(Modifier.size(7.dp).clip(CircleShape).background(Accent))
                         Text(
-                            if (appareils.size > 1) "${appareils.size} contacts" else "${appareils.size} contact",
-                            color = TexteDoux,
+                            when {
+                                enAttente > 1 -> "$enAttente nouveaux messages"
+                                enAttente == 1 -> "1 nouveau message"
+                                appareils.size > 1 -> "${appareils.size} contacts · chiffré, sans internet"
+                                else -> "Chiffré, sans internet"
+                            },
+                            color = if (enAttente > 0) Accent else TexteDoux,
                             fontSize = 13.sp,
                         )
                     }
@@ -194,6 +340,7 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
                             )
                             Text("Souhaite t'écrire", color = TexteDoux, fontSize = 13.sp)
                         }
+                        Bouton("Refuser", couleur = TexteDoux, plein = false) { Reseau.supprimerContact(d.nom) }
                         Bouton("Accepter", plein = false) { Reseau.accepter(d.nom) }
                     }
                 }
@@ -325,7 +472,8 @@ private fun LiaisonEntrante(numero: String) {
 @Composable
 private fun LigneAppareil(a: Appareil, onClick: () -> Unit) {
     val nom = Reseau.nomAffiche(a.nom)
-    val dernier = Reseau.messages.lastOrNull { it.avec == a.nom }
+    val dernier = Reseau.messages.lastOrNull { it.avec == a.nom && it.de != Reseau.SYSTEME }
+    val nonLus = Reseau.nonLus(a.nom)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -334,7 +482,22 @@ private fun LigneAppareil(a: Appareil, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Avatar(nom, couleurDe(a.nom), 50.dp)
+        Box {
+            Avatar(nom, couleurDe(a.nom), 50.dp)
+            // Point vert : le contact est joignable sur le Wi-Fi local.
+            if (a.adresse != null) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(14.dp)
+                        .clip(CircleShape)
+                        .background(Fond)
+                        .padding(2.5.dp)
+                        .clip(CircleShape)
+                        .background(Accent)
+                )
+            }
+        }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
@@ -350,14 +513,29 @@ private fun LigneAppareil(a: Appareil, onClick: () -> Unit) {
             }
             // Le contenu reste masqué ici : il ne s'affiche qu'après le code, dans la conversation.
             Text(
-                if (dernier != null) "Message chiffré" else "Pas encore de message",
-                color = TexteDoux,
+                when {
+                    nonLus > 1 -> "$nonLus nouveaux messages"
+                    nonLus == 1 -> "Nouveau message"
+                    dernier == null -> if (a.cle == null) "Clé pas encore échangée" else "Pas encore de message"
+                    dernier.moi -> "Message envoyé"
+                    else -> "Message chiffré"
+                },
+                color = if (nonLus > 0) Accent else TexteDoux,
+                fontWeight = if (nonLus > 0) FontWeight.SemiBold else FontWeight.Normal,
                 fontSize = 14.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Icone("chevronDroit", Separateur, 16.dp)
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            if (dernier != null) Text(momentCourt(dernier.heure), color = if (nonLus > 0) Accent else TexteDoux, fontSize = 12.sp)
+            if (nonLus > 0) {
+                Box(
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(Accent).padding(horizontal = 7.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.Center,
+                ) { Text(if (nonLus > 99) "99+" else "$nonLus", color = Fond, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+            }
+        }
     }
 }
 
@@ -366,11 +544,14 @@ private fun LigneAppareil(a: Appareil, onClick: () -> Unit) {
 // ---------------------------------------------------------------------------------------------
 
 // Fausse conversation affichée avec le code leurre : rien de réel, rien n'est envoyé.
-private val LEURRE = listOf(
-    Message("", "Moi", "Tu passes à la boulangerie ?", moi = true),
-    Message("", "Moi", "Ok, je prends du pain complet.", moi = false),
-    Message("", "Moi", "Merci, à ce soir.", moi = true),
-)
+private fun filLeurreInitial(): List<Message> {
+    val t = System.currentTimeMillis()
+    return listOf(
+        Message("", "Moi", "Tu passes à la boulangerie ?", moi = true, heure = t - 3 * 3_600_000L, statut = Statut.LU),
+        Message("", "Moi", "Ok, je prends du pain complet.", moi = false, heure = t - 3 * 3_600_000L + 240_000L),
+        Message("", "Moi", "Merci, à ce soir.", moi = true, heure = t - 3 * 3_600_000L + 300_000L, statut = Statut.LU),
+    )
+}
 
 // Réponses automatiques de la fausse conversation, pour qu'elle paraisse vivante.
 private val REPONSES_LEURRE = listOf(
@@ -387,25 +568,35 @@ private val REPONSES_LEURRE = listOf(
 )
 
 @Composable
-private fun Conversation(nom: String, onRetour: () -> Unit, onReglages: () -> Unit) {
+private fun Conversation(nom: String, onRetour: () -> Unit) {
     var saisie by remember { mutableStateOf("") }
-    // Verrouillée à chaque ouverture : "verrouillee", "reelle" (vrais messages) ou "leurre" (fausse conversation).
-    var mode by remember { mutableStateOf("verrouillee") }
-    val filLeurre = remember { mutableStateListOf<Message>().apply { addAll(LEURRE) } }
+    // Verrouillée à chaque ouverture et à chaque retour dans l'appli :
+    // "verrouillee", "reelle" (vrais messages) ou "leurre" (fausse conversation).
+    var mode by remember(Reseau.session.value) { mutableStateOf("verrouillee") }
+    var menu by remember(Reseau.session.value) { mutableStateOf(false) }
+    val filLeurre = remember { mutableStateListOf<Message>().apply { addAll(filLeurreInitial()) } }
+    var ephemereLeurre by remember { mutableStateOf(0) }
     val fil = if (mode == "leurre") filLeurre else Reseau.messages.filter { it.avec == nom }
     val contact = Reseau.appareils[nom]
     val nomAffiche = Reseau.nomAffiche(nom)
     val etatListe = rememberLazyListState()
+    val duree = if (mode == "leurre") ephemereLeurre else (Reseau.ephemeres[nom] ?: 0)
 
     LaunchedEffect(fil.size, mode) {
-        if (mode != "verrouillee" && fil.isNotEmpty()) etatListe.animateScrollToItem(fil.size - 1)
+        if (mode != "verrouillee" && fil.isNotEmpty()) etatListe.animateScrollToItem(fil.size)
+        if (mode == "reelle") Reseau.marquerLu(nom)
     }
 
-    // Fausse conversation : une réponse arrive après un délai différent à chaque fois (3 à 25 s).
-    // Si un nouveau message part entre-temps, l'attente repart de zéro.
+    // Fausse conversation : une réponse arrive après un délai différent à chaque fois (3 à 25 s),
+    // et les messages envoyés passent à « Remis » puis « Lu » comme les vrais.
     LaunchedEffect(filLeurre.size, mode) {
-        if (mode == "leurre" && filLeurre.size > LEURRE.size && filLeurre.last().moi) {
-            delay(Random.nextLong(3_000, 25_000))
+        if (mode == "leurre" && filLeurre.isNotEmpty() && filLeurre.last().moi && filLeurre.last().statut == Statut.ENVOI) {
+            val attente = Random.nextLong(3_000, 25_000)
+            delay(1_200)
+            filLeurre[filLeurre.size - 1] = filLeurre.last().copy(statut = Statut.REMIS)
+            delay(attente)
+            for (i in filLeurre.indices) if (filLeurre[i].moi) filLeurre[i] = filLeurre[i].copy(statut = Statut.LU)
+            delay(Random.nextLong(1_500, 4_000))
             val derniere = filLeurre.lastOrNull { !it.moi }?.texte
             filLeurre.add(Message("", "Moi", REPONSES_LEURRE.filter { it != derniere }.random(), moi = false))
         }
@@ -413,7 +604,7 @@ private fun Conversation(nom: String, onRetour: () -> Unit, onReglages: () -> Un
 
     Column(modifier = Modifier.fillMaxSize().background(Fond).statusBarsPadding().navigationBarsPadding().imePadding()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -431,12 +622,15 @@ private fun Conversation(nom: String, onRetour: () -> Unit, onReglages: () -> Un
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val code = contact?.cle?.let { Reseau.codeSecurite(it) }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (code != null) Icone("cadenas", Accent, 11.dp)
+                    if (contact?.cle != null) Icone("cadenas", Accent, 11.dp)
                     Text(
-                        if (code != null) "Code de sécurité $code" else "Clé pas encore échangée",
-                        color = if (code != null) TexteDoux else Ephemere,
+                        when {
+                            contact?.cle == null -> "Clé pas encore échangée"
+                            contact?.adresse != null -> "Chiffré · Wi-Fi local"
+                            else -> "Chiffré · SMS"
+                        },
+                        color = if (contact?.cle != null) TexteDoux else Ephemere,
                         fontSize = 12.sp,
                         maxLines = 1,
                     )
@@ -445,8 +639,33 @@ private fun Conversation(nom: String, onRetour: () -> Unit, onReglages: () -> Un
             if (contact?.cle == null && contact?.numero != null) {
                 Bouton("Envoyer ma clé", plein = false) { Reseau.envoyerCle(nom) }
             }
+            if (mode != "verrouillee") {
+                Box(
+                    modifier = Modifier.size(44.dp).clip(CircleShape).clickable { menu = !menu },
+                    contentAlignment = Alignment.Center,
+                ) { Icone("menu", if (menu) Accent else Texte, 22.dp) }
+            }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(Separateur))
+
+        AnimatedVisibility(visible = menu && mode != "verrouillee") {
+            MenuConversation(
+                codeSecurite = contact?.cle?.let { Reseau.codeSecurite(it) },
+                duree = duree,
+                surDuree = {
+                    val suivante = when (duree) { 0 -> 60; 60 -> 3600; 3600 -> 86400; else -> 0 }
+                    if (mode == "leurre") ephemereLeurre = suivante else Reseau.definirEphemere(nom, suivante)
+                },
+                surEffacer = {
+                    if (mode == "leurre") filLeurre.clear() else Reseau.effacerConversation(nom)
+                    menu = false
+                },
+                surSupprimer = {
+                    if (mode != "leurre") Reseau.supprimerContact(nom)
+                    onRetour()
+                },
+            )
+        }
 
         if (mode == "verrouillee") {
             Column(
@@ -459,34 +678,20 @@ private fun Conversation(nom: String, onRetour: () -> Unit, onReglages: () -> Un
                     contentAlignment = Alignment.Center,
                 ) { Icone("cadenas", Accent, 30.dp) }
                 Spacer(Modifier.height(16.dp))
-                if (!Reseau.codeDefini()) {
-                    Text("Aucun code défini", color = Texte, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Choisis un code d'accès dans les réglages pour lire et envoyer des messages.",
-                        color = TexteDoux,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.height(18.dp))
-                    Bouton("Ouvrir les réglages", onClick = onReglages)
-                } else {
-                    Text("Conversation verrouillée", color = Texte, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(6.dp))
-                    Text("Saisis ton code pour afficher les messages", color = TexteDoux, fontSize = 14.sp)
-                    Spacer(Modifier.height(22.dp))
-                    Clavier { code ->
-                        val attente = Reseau.attenteCode()
-                        when {
-                            attente > 0 -> "Trop d'essais. Réessaie dans ${dureeLisible(attente)}."
-                            Reseau.verifierCode(code) -> { Reseau.noterEssai(true); mode = "reelle"; null }
-                            Reseau.verifierLeurre(code) -> { Reseau.noterEssai(true); mode = "leurre"; null }
-                            else -> {
-                                Reseau.noterEssai(false)
-                                val suite = Reseau.attenteCode()
-                                if (suite > 0) "Code incorrect. Réessaie dans ${dureeLisible(suite)}." else "Code incorrect"
-                            }
+                Text("Conversation verrouillée", color = Texte, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+                Text("Saisis ton code pour afficher les messages", color = TexteDoux, fontSize = 14.sp)
+                Spacer(Modifier.height(22.dp))
+                Clavier { code ->
+                    val attente = Reseau.attenteCode()
+                    when {
+                        attente > 0 -> "Trop d'essais. Réessaie dans ${dureeLisible(attente)}."
+                        Reseau.verifierCode(code) -> { Reseau.noterEssai(true); mode = "reelle"; null }
+                        Reseau.verifierLeurre(code) -> { Reseau.noterEssai(true); mode = "leurre"; null }
+                        else -> {
+                            Reseau.noterEssai(false)
+                            val suite = Reseau.attenteCode()
+                            if (suite > 0) "Code incorrect. Réessaie dans ${dureeLisible(suite)}." else "Code incorrect"
                         }
                     }
                 }
@@ -498,6 +703,11 @@ private fun Conversation(nom: String, onRetour: () -> Unit, onReglages: () -> Un
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    Box(
+                        modifier = Modifier.size(64.dp).clip(CircleShape).background(Surface),
+                        contentAlignment = Alignment.Center,
+                    ) { Icone("bulle", TexteDoux, 28.dp) }
+                    Spacer(Modifier.height(14.dp))
                     Text("Aucun message", color = Texte, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(6.dp))
                     Text(
@@ -511,12 +721,28 @@ private fun Conversation(nom: String, onRetour: () -> Unit, onReglages: () -> Un
                 LazyColumn(
                     state = etatListe,
                     modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    item { Spacer(Modifier.height(8.dp)) }
-                    items(fil) { m -> Bulle(m) }
-                    item { Spacer(Modifier.height(8.dp)) }
+                    itemsIndexed(fil, key = { _, m -> m.id }) { i, m ->
+                        Column(modifier = Modifier.animateItem()) {
+                            if (i == 0 || !memeJour(fil[i - 1].heure, m.heure)) SeparateurJour(m.heure)
+                            // Les messages d'une même personne à la suite sont resserrés.
+                            val suiteDuMeme = i > 0 && fil[i - 1].moi == m.moi && fil[i - 1].de != Reseau.SYSTEME &&
+                                memeJour(fil[i - 1].heure, m.heure)
+                            Spacer(Modifier.height(if (suiteDuMeme) 3.dp else 10.dp))
+                            Bulle(m)
+                        }
+                    }
+                    item { Spacer(Modifier.height(10.dp)) }
                 }
+            }
+            if (duree > 0) {
+                Text(
+                    "Messages éphémères : effacés ${dureeEphemere(duree)} après l'envoi",
+                    color = Ephemere,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+                )
             }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp),
@@ -529,12 +755,12 @@ private fun Conversation(nom: String, onRetour: () -> Unit, onReglages: () -> Un
                         .padding(bottom = 4.dp)
                         .size(48.dp)
                         .clip(CircleShape)
-                        .background(if (saisie.isBlank()) SurfaceHaute else Accent)
+                        .background(if (saisie.isBlank()) SurfaceHaute else if (duree > 0) Ephemere else Accent)
                         .clickable {
                             val texte = saisie.trim()
                             if (texte.isNotEmpty()) {
                                 // En mode leurre, le message reste à l'écran et ne part nulle part.
-                                if (mode == "leurre") filLeurre.add(Message("", "Moi", texte, moi = true))
+                                if (mode == "leurre") filLeurre.add(Message("", "Moi", texte, moi = true, statut = Statut.ENVOI))
                                 else Reseau.envoyer(nom, texte)
                                 saisie = ""
                             }
@@ -543,6 +769,70 @@ private fun Conversation(nom: String, onRetour: () -> Unit, onReglages: () -> Un
                 ) { Icone("envoyer", if (saisie.isBlank()) TexteDoux else Fond, 22.dp) }
             }
         }
+    }
+}
+
+@Composable
+private fun MenuConversation(
+    codeSecurite: String?,
+    duree: Int,
+    surDuree: () -> Unit,
+    surEffacer: () -> Unit,
+    surSupprimer: () -> Unit,
+) {
+    // Les actions définitives demandent un second appui.
+    var aConfirmer by remember { mutableStateOf("") }
+    Column(modifier = Modifier.fillMaxWidth().background(Surface).padding(horizontal = 20.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        if (codeSecurite != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Code de sécurité  $codeSecurite", color = Texte, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Aide("Il doit être identique sur le téléphone de ton contact. Comparez-le de vive voix.")
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Separateur))
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = surDuree),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Messages éphémères", color = Texte, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Aide("Les nouveaux messages s'effacent des deux téléphones après ce délai. Appuie pour changer.")
+            }
+            Bouton(dureeEphemere(duree), couleur = if (duree > 0) Ephemere else TexteDoux, plein = false, onClick = surDuree)
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Separateur))
+        Text(
+            if (aConfirmer == "effacer") "Appuie encore pour tout effacer" else "Effacer la conversation",
+            color = Danger,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.fillMaxWidth().clickable {
+                if (aConfirmer == "effacer") { aConfirmer = ""; surEffacer() } else aConfirmer = "effacer"
+            },
+        )
+        Text(
+            if (aConfirmer == "supprimer") "Appuie encore pour supprimer le contact" else "Supprimer le contact",
+            color = Danger,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.fillMaxWidth().clickable {
+                if (aConfirmer == "supprimer") { aConfirmer = ""; surSupprimer() } else aConfirmer = "supprimer"
+            },
+        )
+    }
+}
+
+@Composable
+private fun SeparateurJour(t: Long) {
+    Box(modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 2.dp), contentAlignment = Alignment.Center) {
+        Text(
+            jourLisible(t),
+            color = TexteDoux,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.clip(RoundedCornerShape(50)).background(Surface).padding(horizontal = 12.dp, vertical = 4.dp),
+        )
     }
 }
 
@@ -555,6 +845,8 @@ private fun Clavier(surCode: (String) -> String?) {
     var code by remember { mutableStateOf("") }
     var erreur by remember { mutableStateOf("") }
     val faux = erreur.isNotEmpty()
+    val vibration = LocalHapticFeedback.current
+    fun toucher() = vibration.performHapticFeedback(HapticFeedbackType.TextHandleMove)
 
     fun valider() {
         if (code.length < 4) return
@@ -579,15 +871,15 @@ private fun Clavier(surCode: (String) -> String?) {
         listOf("123", "456", "789").forEach { rangee ->
             Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
                 rangee.forEach { c ->
-                    Touche(onClick = { if (code.length < 8) { code += c; erreur = "" } }) {
+                    Touche(onClick = { toucher(); if (code.length < 8) { code += c; erreur = "" } }) {
                         Text(c.toString(), color = Texte, fontSize = 26.sp)
                     }
                 }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
-            Touche(fond = Color.Transparent, onClick = { code = code.dropLast(1) }) { Icone("effacer", TexteDoux, 24.dp) }
-            Touche(onClick = { if (code.length < 8) { code += "0"; erreur = "" } }) {
+            Touche(fond = Color.Transparent, onClick = { toucher(); code = code.dropLast(1) }) { Icone("effacer", TexteDoux, 24.dp) }
+            Touche(onClick = { toucher(); if (code.length < 8) { code += "0"; erreur = "" } }) {
                 Text("0", color = Texte, fontSize = 26.sp)
             }
             Touche(fond = if (code.length >= 4) Accent else SurfaceHaute, onClick = { valider() }) {
@@ -614,13 +906,13 @@ private fun Bulle(m: Message) {
             fontSize = 12.sp,
             lineHeight = 17.sp,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp),
         )
         return
     }
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (m.moi) Arrangement.End else Arrangement.Start,
+        horizontalAlignment = if (m.moi) Alignment.End else Alignment.Start,
     ) {
         val forme = RoundedCornerShape(
             topStart = 20.dp,
@@ -637,6 +929,26 @@ private fun Bulle(m: Message) {
         ) {
             Text(m.texte, color = if (m.moi) Fond else Texte, fontSize = 15.sp, lineHeight = 21.sp)
         }
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            if (m.expire > 0) Text("Éphémère ·", color = Ephemere, fontSize = 11.sp)
+            Text(heureCourte(m.heure), color = TexteDoux, fontSize = 11.sp)
+            if (m.moi) {
+                val (libelle, couleur) = when (m.statut) {
+                    Statut.ENVOI -> "Envoi…" to TexteDoux
+                    Statut.ENVOYE -> "Envoyé" to TexteDoux
+                    Statut.REMIS -> "Remis" to TexteDoux
+                    Statut.LU -> "Lu" to Accent
+                    Statut.ECHEC -> "Non remis" to Danger
+                    Statut.ATTENTE -> "En attente de la clé" to Ephemere
+                    else -> "" to TexteDoux
+                }
+                if (libelle.isNotEmpty()) Text("· $libelle", color = couleur, fontSize = 11.sp)
+            }
+        }
     }
 }
 
@@ -651,6 +963,7 @@ private fun Reglages(onRetour: () -> Unit) {
     var leurreNouveau by remember { mutableStateOf("") }
     var codeActuel by remember { mutableStateOf("") }
     var codeActuelLeurre by remember { mutableStateOf("") }
+    var confirmeEffacement by remember { mutableStateOf(false) }
     var infoCode by remember { mutableStateOf("") }
     var infoLeurre by remember { mutableStateOf("") }
     var infoNumero by remember { mutableStateOf("") }
@@ -799,6 +1112,32 @@ private fun Reglages(onRetour: () -> Unit) {
                 Aide("Sert à l'envoi par SMS et à l'invitation de tes contacts.")
             }
 
+            SectionReglage("Messages", "bulle") {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Accusés de lecture", color = Texte, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                        Aide("Prévient ton contact quand tu as lu ses messages. Coûte un SMS à chaque lecture hors Wi-Fi.")
+                    }
+                    Bascule(Reseau.accuses.value) { Reseau.definirAccuses(it) }
+                }
+                Box(Modifier.fillMaxWidth().height(1.dp).background(Separateur))
+                Text(
+                    if (confirmeEffacement) "Appuie encore pour tout effacer" else "Effacer toutes les conversations",
+                    color = Danger,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        if (confirmeEffacement) {
+                            Reseau.toutEffacer()
+                            confirmeEffacement = false
+                        } else {
+                            confirmeEffacement = true
+                        }
+                    },
+                )
+                Aide("Les contacts et les clés sont gardés.")
+            }
+
             SectionReglage("Connexions", "reglages") {
                 LigneEtat("SMS", "Chiffré", Accent, "Fonctionne sans internet")
                 Box(Modifier.fillMaxWidth().height(1.dp).background(Separateur))
@@ -806,7 +1145,7 @@ private fun Reglages(onRetour: () -> Unit) {
             }
 
             Text(
-                "Messagerie · version de test",
+                "Messagerie · version 1.0",
                 color = TexteDoux,
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center,
@@ -947,6 +1286,22 @@ private fun Champ(
     )
 }
 
+@Composable
+private fun Bascule(actif: Boolean, surChangement: (Boolean) -> Unit) {
+    Box(
+        modifier = Modifier
+            .width(50.dp)
+            .height(30.dp)
+            .clip(RoundedCornerShape(50))
+            .background(if (actif) Accent else SurfaceHaute)
+            .clickable { surChangement(!actif) }
+            .padding(4.dp),
+        contentAlignment = if (actif) Alignment.CenterEnd else Alignment.CenterStart,
+    ) {
+        Box(Modifier.size(22.dp).clip(CircleShape).background(if (actif) Fond else TexteDoux))
+    }
+}
+
 // Bouton plein (action principale) ou teinté (action secondaire).
 @Composable
 private fun Bouton(
@@ -1035,6 +1390,11 @@ private fun Icone(type: String, couleur: Color, taille: Dp = 22.dp) {
                     style = trait,
                 )
                 brise(0.3f, 0.7f, 0.3f, 0.88f, 0.5f, 0.7f)
+            }
+            "menu" -> {
+                drawCircle(couleur, radius = w * 0.075f, center = p(0.5f, 0.22f))
+                drawCircle(couleur, radius = w * 0.075f, center = p(0.5f, 0.5f))
+                drawCircle(couleur, radius = w * 0.075f, center = p(0.5f, 0.78f))
             }
             "reglages" -> {
                 ligne(0.15f, 0.25f, 0.85f, 0.25f)
