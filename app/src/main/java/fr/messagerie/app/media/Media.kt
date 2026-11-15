@@ -91,8 +91,8 @@ object Media {
         var pas = 1
         while (maxOf(bornes.outWidth, bornes.outHeight) / (pas * 2) >= cote) pas *= 2
         val options = BitmapFactory.Options().apply { inSampleSize = pas }
-        var image = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
-        if (image == null) null else {
+        val decodee = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+        if (decodee == null) null else {
             // Les photos gardent leur sens : on applique la rotation notée par l'appareil photo.
             val angle = try {
                 context.contentResolver.openInputStream(uri)?.use { flux ->
@@ -106,13 +106,13 @@ object Media {
             } catch (e: Exception) {
                 0f
             }
-            image = ajuster(image, cote, angle)
+            var image: Bitmap = ajuster(decodee, cote, angle)
             var q = qualite
             var octets = compresser(image, q)
             var essais = 0
             while (octets.size > maximum && essais < 12) {
-                if (q > 40) q -= 10 else image = ajuster(image, (maxOf(image!!.width, image.height) * 3) / 4, 0f)
-                octets = compresser(image!!, q)
+                if (q > 40) q -= 10 else image = ajuster(image, (maxOf(image.width, image.height) * 3) / 4, 0f)
+                octets = compresser(image, q)
                 essais++
             }
             if (octets.size > maximum) null else octets
