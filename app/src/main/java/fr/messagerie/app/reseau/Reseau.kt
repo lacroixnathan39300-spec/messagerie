@@ -20,6 +20,9 @@ import java.io.InputStreamReader
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.security.MessageDigest
+import java.security.SecureRandom
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
 import java.net.ServerSocket
 import java.net.Socket
 
@@ -424,6 +427,31 @@ object Reseau {
             }
             liaisonsEnAttente.remove(cleEntree)
         }
+    }
+
+    // Code d'accès : demandé à chaque ouverture d'une conversation. Stocké sous forme de empreinte (PBKDF2).
+    fun codeDefini(): Boolean = prefs?.contains("codeHash") == true
+
+    fun definirCode(code: String) {
+        val p = prefs ?: return
+        val sel = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        val empreinte = hacher(code, sel)
+        p.edit()
+            .putString("codeSel", android.util.Base64.encodeToString(sel, android.util.Base64.NO_WRAP))
+            .putString("codeHash", android.util.Base64.encodeToString(empreinte, android.util.Base64.NO_WRAP))
+            .apply()
+    }
+
+    fun verifierCode(saisie: String): Boolean {
+        val p = prefs ?: return false
+        val sel = android.util.Base64.decode(p.getString("codeSel", null) ?: return false, android.util.Base64.NO_WRAP)
+        val attendu = android.util.Base64.decode(p.getString("codeHash", null) ?: return false, android.util.Base64.NO_WRAP)
+        return MessageDigest.isEqual(hacher(saisie, sel), attendu)
+    }
+
+    private fun hacher(code: String, sel: ByteArray): ByteArray {
+        val fabrique = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        return fabrique.generateSecret(PBEKeySpec(code.toCharArray(), sel, 200000, 256)).encoded
     }
 
     // Envoie notre clé publique par SMS à un contact dont on connaît le numéro.

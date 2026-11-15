@@ -269,6 +269,10 @@ private fun LigneAppareil(a: Appareil, onClick: () -> Unit) {
 @Composable
 private fun Conversation(nom: String, onRetour: () -> Unit) {
     var saisie by remember { mutableStateOf("") }
+    // Verrouillée à chaque ouverture : les messages restent masqués tant que le code n'est pas saisi.
+    var deverrouillee by remember { mutableStateOf(false) }
+    var codeSaisi by remember { mutableStateOf("") }
+    var codeFaux by remember { mutableStateOf(false) }
     val fil = Reseau.messages.filter { it.avec == nom }
 
     Column(modifier = Modifier.fillMaxSize().background(Fond).statusBarsPadding().navigationBarsPadding()) {
@@ -292,13 +296,54 @@ private fun Conversation(nom: String, onRetour: () -> Unit) {
                 Puce("Envoyer ma clé", Accent, modifier = Modifier.clickable { Reseau.envoyerCle(nom) })
             }
         }
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(fil) { m -> Bulle(m) }
+        if (!deverrouillee) {
+            Column(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(20.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (!Reseau.codeDefini()) {
+                    Text("Définis d'abord un code dans Réglages pour lire les messages.", color = TexteDoux, fontSize = 14.sp)
+                } else {
+                    Text("Messages masqués. Saisis ton code pour les afficher.", color = TexteDoux, fontSize = 14.sp)
+                    Spacer(Modifier.height(12.dp))
+                    TextField(
+                        value = codeSaisi,
+                        onValueChange = { codeSaisi = it; codeFaux = false },
+                        placeholder = { Text("Code", color = TexteDoux) },
+                        isError = codeFaux,
+                        shape = RoundedCornerShape(50),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Surface,
+                            unfocusedContainerColor = Surface,
+                            focusedTextColor = Texte,
+                            unfocusedTextColor = Texte,
+                            cursorColor = Accent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                        ),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Puce("Déverrouiller", Accent, modifier = Modifier.clickable {
+                        if (Reseau.verifierCode(codeSaisi)) {
+                            deverrouillee = true
+                            codeSaisi = ""
+                        } else {
+                            codeFaux = true
+                        }
+                    })
+                    if (codeFaux) Text("Code incorrect", color = Ephemere, fontSize = 13.sp)
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(fil) { m -> Bulle(m) }
+            }
         }
-        Row(
+        if (deverrouillee) Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -348,6 +393,33 @@ private fun Reglages(onRetour: () -> Unit) {
         )
         Text("Réglages", color = Texte, fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(20.dp))
+        Text("Code d'accès aux conversations (demandé à chaque ouverture)", color = TexteDoux, fontSize = 13.sp)
+        Spacer(Modifier.height(6.dp))
+        var codeNouveau by remember { mutableStateOf("") }
+        TextField(
+            value = codeNouveau,
+            onValueChange = { codeNouveau = it.filter { c -> c.isDigit() }.take(8) },
+            placeholder = { Text("4 à 8 chiffres", color = TexteDoux) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Surface,
+                unfocusedContainerColor = Surface,
+                focusedTextColor = Texte,
+                unfocusedTextColor = Texte,
+                cursorColor = Accent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+            ),
+        )
+        Spacer(Modifier.height(6.dp))
+        Puce(if (Reseau.codeDefini()) "Changer le code" else "Définir le code", Accent, modifier = Modifier.clickable {
+            if (codeNouveau.length >= 4) {
+                Reseau.definirCode(codeNouveau)
+                codeNouveau = ""
+            }
+        })
+        Spacer(Modifier.height(16.dp))
         Text("Ton pseudo (visible par les autres, sans numéro)", color = TexteDoux, fontSize = 13.sp)
         Spacer(Modifier.height(6.dp))
         var pseudoSaisi by remember { mutableStateOf(Reseau.monPseudo.value) }
