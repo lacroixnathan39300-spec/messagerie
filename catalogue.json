@@ -5,6 +5,12 @@
       "description": "Messagerie chiffrée, sans serveur. Wi-Fi local et SMS.",
       "paquet": "fr.messagerie.app",
       "apk": "https://github.com/lacroixnathan39300-spec/messagerie/releases/latest/download/Messagerie.apk"
+    },
+    {
+      "nom": "Coffre",
+      "description": "Coffre-fort chiffré : mots de passe, cartes, carte Vitale. Sans serveur.",
+      "paquet": "fr.messagerie.coffre",
+      "apk": "https://github.com/lacroixnathan39300-spec/messagerie/releases/latest/download/Coffre.apk"
     }
   ]
 }

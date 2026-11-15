@@ -17,13 +17,14 @@ jobs:
       - name: Compilation des APK (Messagerie + Mes applis), signées
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleRelease :hub:assembleRelease --no-daemon -Pvc=${{ github.run_number }}
+          ./gradlew :app:assembleRelease :hub:assembleRelease :coffre:assembleRelease --no-daemon -Pvc=${{ github.run_number }}
       - uses: actions/upload-artifact@v4
         with:
           name: messagerie-release
           path: |
             app/build/outputs/apk/release/*.apk
             hub/build/outputs/apk/release/*.apk
+            coffre/build/outputs/apk/release/*.apk
       - name: Publication de l'APK en release GitHub
         env:
           GH_TOKEN: ${{ github.token }}
@@ -31,4 +32,5 @@ jobs:
           TAG="test-${{ github.run_number }}"
           cp app/build/outputs/apk/release/app-release.apk Messagerie.apk
           cp hub/build/outputs/apk/release/hub-release.apk MesApplis.apk
-          gh release create "$TAG" Messagerie.apk MesApplis.apk --title "Messagerie test ${{ github.run_number }}" --notes "APK signées (clé stable)." --latest || gh release upload "$TAG" Messagerie.apk MesApplis.apk --clobber
+          cp coffre/build/outputs/apk/release/coffre-release.apk Coffre.apk
+          gh release create "$TAG" Messagerie.apk MesApplis.apk Coffre.apk --title "Messagerie test ${{ github.run_number }}" --notes "APK signées (clé stable)." --latest || gh release upload "$TAG" Messagerie.apk MesApplis.apk Coffre.apk --clobber

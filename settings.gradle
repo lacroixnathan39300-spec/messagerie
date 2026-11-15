@@ -8,3 +8,4 @@ dependencyResolutionManagement {
 rootProject.name = "Messagerie"
 include ":app"
 include ":hub"
+include ":coffre"
