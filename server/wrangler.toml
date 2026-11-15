@@ -1,0 +1,14 @@
+name = "messagerie"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+# Annuaire : pseudo -> clé publique et identifiant de boîte. Aucun numéro n'est stocké.
+[[kv_namespaces]]
+binding = "ANNUAIRE"
+id = "REMPLACE_ANNUAIRE_PAR_LA_CI"
+
+# Boîtes : messages chiffrés en attente, effacés après livraison (ou après 7 jours).
+[[kv_namespaces]]
+binding = "BOITES"
+id = "REMPLACE_BOITES_PAR_LA_CI"
