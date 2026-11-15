@@ -13,6 +13,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import fr.messagerie.app.media.Media
 import kotlinx.coroutines.Dispatchers
@@ -330,6 +331,7 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
                     )
                 }
             }
+            if (!Reseau.smsAutorise.value) item { AideSms() }
             item { LiaisonParCode() }
             if (demandes.isNotEmpty()) {
                 item { TitreSection("Demandes · ${demandes.size}", Ephemere) }
@@ -390,6 +392,79 @@ private fun ListeDiscussions(onOuvrir: (String) -> Unit, onReglages: () -> Unit)
             item { Spacer(Modifier.height(12.dp)) }
         }
         BarreBas(onReglages)
+    }
+}
+
+// Android bloque l'autorisation SMS des applis installées hors du Play Store (« paramètre restreint »).
+// L'appli ne peut pas lever ce blocage elle-même : cette carte guide pas à pas et ouvre le bon écran.
+@Composable
+private fun AideSms() {
+    val contexte = LocalContext.current
+    var essais by remember { mutableStateOf(0) }
+    val demande = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        essais++
+        Reseau.verifierPermissions()
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Ephemere.copy(alpha = 0.10f))
+            .border(1.dp, Ephemere.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Autorise les SMS", color = Texte, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            "Sans cette autorisation, aucun message ne peut partir ni arriver.",
+            color = TexteDoux,
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+        )
+        Bouton("1. Autoriser les SMS", modifier = Modifier.fillMaxWidth(), couleur = Ephemere) {
+            demande.launch(
+                arrayOf(
+                    android.Manifest.permission.SEND_SMS,
+                    android.Manifest.permission.RECEIVE_SMS,
+                    android.Manifest.permission.RECEIVE_MMS,
+                    android.Manifest.permission.READ_SMS,
+                )
+            )
+        }
+        if (essais > 0) {
+            Text(
+                "Android a refusé ? C'est son blocage des applis installées hors Play Store. Pour le lever :",
+                color = Texte,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+            )
+            EtapeSms("2", "Appuie sur le bouton ci-dessous : la fiche de Messagerie s'ouvre.")
+            EtapeSms("3", "En haut à droite, appuie sur ⋮ puis « Autoriser les paramètres restreints », et confirme avec ton code de téléphone.")
+            EtapeSms("4", "Toujours dans la fiche : Autorisations → SMS → Autoriser. Puis reviens ici.")
+            Bouton("Ouvrir la fiche de Messagerie", modifier = Modifier.fillMaxWidth(), couleur = Ephemere, plein = false) {
+                try {
+                    contexte.startActivity(
+                        android.content.Intent(
+                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + contexte.packageName),
+                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                } catch (e: Exception) { }
+            }
+            Aide("Le menu ⋮ n'apparaît qu'après un premier refus. Sur certains téléphones il s'appelle « Plus » ou se trouve tout en bas de la fiche.")
+        }
+    }
+}
+
+@Composable
+private fun EtapeSms(numero: String, texte: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(
+            modifier = Modifier.size(22.dp).clip(CircleShape).background(Ephemere.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center,
+        ) { Text(numero, color = Ephemere, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+        Text(texte, color = Texte, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.weight(1f))
     }
 }
 

@@ -47,6 +47,12 @@ class MainActivity : ComponentActivity() {
         Reseau.surPremierPlan(true)
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Retour des paramètres du téléphone : l'autorisation SMS a peut-être changé.
+        Reseau.verifierPermissions()
+    }
+
     override fun onStop() {
         Reseau.surPremierPlan(false)
         super.onStop()

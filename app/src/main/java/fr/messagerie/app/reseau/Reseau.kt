@@ -117,6 +117,7 @@ object Reseau {
         if (!actif && !choixEnCours) session.value = session.value + 1
         if (actif) {
             choixEnCours = false
+            verifierPermissions()
             purger()
             releverMmsEnFond()
             viderNoms()
@@ -127,6 +128,16 @@ object Reseau {
     }
 
     @Volatile var choixEnCours = false
+
+    // Vrai quand Android a accordé l'envoi et la réception des SMS. Relu à chaque retour dans l'appli.
+    val smsAutorise = mutableStateOf(true)
+
+    fun verifierPermissions() {
+        val contexte = appContext ?: return
+        smsAutorise.value = listOf(android.Manifest.permission.SEND_SMS, android.Manifest.permission.RECEIVE_SMS).all {
+            contexte.checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+    }
 
     private var appContext: Context? = null
     private var prefs: SharedPreferences? = null
@@ -711,7 +722,10 @@ object Reseau {
     // Noms du carnet d'adresses déjà cherchés, pour ne pas interroger le carnet à chaque affichage.
     private val nomsCarnet = HashMap<String, String>()
 
-    fun viderNoms() = nomsCarnet.clear()
+    fun viderNoms() {
+        nomsCarnet.clear()
+        verifierPermissions()
+    }
 
     // Nom du carnet d'adresses si la permission Contacts est accordée, sinon le numéro.
     fun nomAffiche(id: String): String {
