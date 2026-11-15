@@ -466,6 +466,7 @@ object Reseau {
         return fabrique.generateSecret(PBEKeySpec(code.toCharArray(), sel, 200000, 256)).encoded
     }
 
+    // Au 4e code faux d'affilée, les conversations sont effacées (voir noterEssai).
     // Anti-devinette : après 5 codes faux d'affilée, il faut attendre (30 s, puis le double à chaque
     // nouvel échec, jusqu'à 1 h). Le compteur survit à la fermeture de l'appli.
     fun attenteCode(): Int {
@@ -482,6 +483,11 @@ object Reseau {
         }
         val echecs = p.getInt("echecs", 0) + 1
         val edition = p.edit().putInt("echecs", echecs)
+        // Plus de 3 codes faux d'affilée : toutes les conversations sont effacées, sans rien afficher.
+        if (echecs > 3) {
+            messages.clear()
+            edition.remove("messages")
+        }
         if (echecs >= 5) {
             val secondes = (30L shl (echecs - 5).coerceAtMost(7)).coerceAtMost(3600L)
             edition.putLong("bloqueJusqua", System.currentTimeMillis() + secondes * 1000)
