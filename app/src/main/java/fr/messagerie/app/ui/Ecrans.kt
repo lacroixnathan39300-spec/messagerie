@@ -266,7 +266,6 @@ private fun LigneAppareil(a: Appareil, onClick: () -> Unit) {
     }
 }
 
-@Composable
 // Fausse conversation affichée avec le code leurre : rien de réel, aucune saisie possible.
 private val LEURRE = listOf(
     Message("", "Moi", "Tu passes à la boulangerie ?", moi = true),
