@@ -33,7 +33,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.release
+            signingConfig System.getenv("RELEASE_KEYSTORE") ? signingConfigs.release : null
         }
     }
 }
