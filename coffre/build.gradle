@@ -16,11 +16,15 @@ android {
         versionName '1.0'
     }
     signingConfigs {
+        // Signature de release : lue depuis l'environnement (secrets GitHub), jamais depuis le dépôt.
+        // Sans ces variables, la version release reste non signée.
         release {
-            storeFile file('../app/clef.jks')
-            storePassword 'messagerie2026'
-            keyAlias 'messagerie'
-            keyPassword 'messagerie2026'
+            if (System.getenv("RELEASE_KEYSTORE")) {
+                storeFile file(System.getenv("RELEASE_KEYSTORE"))
+                storePassword System.getenv("RELEASE_STORE_PASSWORD")
+                keyAlias System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword System.getenv("RELEASE_KEY_PASSWORD")
+            }
         }
     }
     buildFeatures { compose true }
