@@ -388,6 +388,7 @@ fun AppTile(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DossierTile(dossier: Dossier, taille: Int, onClick: () -> Unit) {
     Column(
