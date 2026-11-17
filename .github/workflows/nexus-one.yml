@@ -23,3 +23,10 @@ jobs:
         with:
           name: nexus-one-apk
           path: nexus-one/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publication de l'APK (lien direct)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp nexus-one/app/build/outputs/apk/debug/app-debug.apk NexusOne.apk
+          TAG="nexus-one-${{ github.run_number }}"
+          gh release create "$TAG" NexusOne.apk --title "NEXUS ONE test ${{ github.run_number }}" --notes "Version de test du launcher." --prerelease --target "${{ github.sha }}" || gh release upload "$TAG" NexusOne.apk --clobber
