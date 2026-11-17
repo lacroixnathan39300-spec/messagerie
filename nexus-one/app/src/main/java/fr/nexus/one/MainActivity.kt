@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,11 +23,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -48,6 +51,12 @@ data class AppEntry(
     val packageName: String,
     val icon: Drawable,
 )
+
+/** Élément de la grille : une appli libre, ou un dossier. */
+sealed class Ligne {
+    data class Appli(val app: AppEntry) : Ligne()
+    data class DossierLigne(val dossier: Dossier) : Ligne()
+}
 
 private const val PREFS = "nexus"
 private const val CLE_DOCK = "dock"
@@ -105,10 +114,20 @@ fun sauverDock(context: Context, paquets: List<String>) {
 fun LauncherScreen() {
     val context = LocalContext.current
     val apps = remember { loadLaunchableApps(context.packageManager) }
+    val parPaquet = remember(apps) { apps.associateBy { it.packageName } }
+
     var dock by remember { mutableStateOf(chargerDock(context)) }
+    var dossiers by remember { mutableStateOf(chargerDossiers(context)) }
     var reglages by remember { mutableStateOf(chargerReglages(context)) }
     var ouvertReglages by remember { mutableStateOf(false) }
-    val parPaquet = remember(apps) { apps.associateBy { it.packageName } }
+    var appChoisie by remember { mutableStateOf<AppEntry?>(null) }
+    var dossierOuvert by remember { mutableStateOf<Dossier?>(null) }
+
+    val accent = Color(reglages.accent)
+    val paquetsDansDossiers = dossiers.flatMap { it.paquets }.toSet()
+    val lignes: List<Ligne> =
+        apps.filter { it.packageName !in paquetsDansDossiers }.map { Ligne.Appli(it) } +
+            dossiers.map { Ligne.DossierLigne(it) }
     val appsDuDock = dock.mapNotNull { parPaquet[it] }
 
     Column(
@@ -123,9 +142,9 @@ fun LauncherScreen() {
                 .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(text = "NEXUS ONE", color = Color.White, style = MaterialTheme.typography.titleSmall)
+            Text(text = "NEXUS ONE", color = accent, style = MaterialTheme.typography.titleSmall)
             TextButton(onClick = { ouvertReglages = true }) {
-                Text(text = "Réglages", color = Color.White)
+                Text(text = "Réglages", color = accent)
             }
         }
 
@@ -136,34 +155,36 @@ fun LauncherScreen() {
                 .fillMaxWidth()
                 .padding(8.dp),
         ) {
-            items(apps, key = { it.packageName }) { app ->
-                AppTile(
-                    app = app,
-                    taille = reglages.tailleIcone,
-                    onClick = { launchApp(context, app.packageName) },
-                    onLongClick = {
-                        if (app.packageName in dock) {
-                            dock = dock - app.packageName
-                        } else if (dock.size < DOCK_MAX) {
-                            dock = dock + app.packageName
-                        } else {
-                            Toast.makeText(context, "Dock plein ($DOCK_MAX applis)", Toast.LENGTH_SHORT).show()
-                        }
-                        sauverDock(context, dock)
-                    },
-                )
+            items(lignes, key = { if (it is Ligne.Appli) "app:${it.app.packageName}" else "dos:${(it as Ligne.DossierLigne).dossier.nom}" }) { ligne ->
+                when (ligne) {
+                    is Ligne.Appli -> AppTile(
+                        label = ligne.app.label,
+                        icone = ligne.app.icon,
+                        taille = reglages.tailleIcone,
+                        onClick = { launchApp(context, ligne.app.packageName) },
+                        onLongClick = { appChoisie = ligne.app },
+                    )
+                    is Ligne.DossierLigne -> DossierTile(
+                        dossier = ligne.dossier,
+                        taille = reglages.tailleIcone,
+                        onClick = { dossierOuvert = ligne.dossier },
+                    )
+                }
             }
         }
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .border(1.dp, accent, RoundedCornerShape(16.dp))
+                .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             appsDuDock.forEach { app ->
                 AppTile(
-                    app = app,
+                    label = app.label,
+                    icone = app.icon,
                     taille = reglages.tailleIcone,
                     onClick = { launchApp(context, app.packageName) },
                     onLongClick = {
@@ -173,6 +194,69 @@ fun LauncherScreen() {
                 )
             }
         }
+    }
+
+    appChoisie?.let { app ->
+        ActionsAppDialog(
+            app = app,
+            dansDock = app.packageName in dock,
+            dossiers = dossiers,
+            onDock = {
+                if (app.packageName in dock) {
+                    dock = dock - app.packageName
+                } else if (dock.size < DOCK_MAX) {
+                    dock = dock + app.packageName
+                } else {
+                    Toast.makeText(context, "Dock plein ($DOCK_MAX applis)", Toast.LENGTH_SHORT).show()
+                }
+                sauverDock(context, dock)
+                appChoisie = null
+            },
+            onAjouterAuDossier = { nomDossier ->
+                val nettoye = nomDossier.trim().replace("|", " ").replace(";", " ")
+                if (nettoye.isNotEmpty()) {
+                    dossiers = dossiers.map { d ->
+                        if (d.nom == nettoye) d.copy(paquets = d.paquets.filter { it != app.packageName } + app.packageName)
+                        else d.copy(paquets = d.paquets.filter { it != app.packageName })
+                    }.let { liste ->
+                        if (liste.none { it.nom == nettoye }) liste + Dossier(nettoye, listOf(app.packageName)) else liste
+                    }
+                    dossiers = dossiers.filter { it.paquets.isNotEmpty() }
+                    sauverDossiers(context, dossiers)
+                }
+                appChoisie = null
+            },
+            onFermer = { appChoisie = null },
+        )
+    }
+
+    dossierOuvert?.let { dossier ->
+        val actuel = dossiers.firstOrNull { it.nom == dossier.nom } ?: dossier
+        AlertDialog(
+            onDismissRequest = { dossierOuvert = null },
+            title = { Text(actuel.nom) },
+            text = {
+                Column {
+                    actuel.paquets.mapNotNull { parPaquet[it] }.forEach { app ->
+                        TextButton(onClick = {
+                            launchApp(context, app.packageName)
+                            dossierOuvert = null
+                        }) { Text(app.label, color = Color.White) }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    // Retire le dossier, les applis retournent sur l'accueil.
+                    dossiers = dossiers.filter { it.nom != actuel.nom }
+                    sauverDossiers(context, dossiers)
+                    dossierOuvert = null
+                }) { Text("Supprimer le dossier", color = accent) }
+            },
+            dismissButton = {
+                TextButton(onClick = { dossierOuvert = null }) { Text("Fermer") }
+            },
+        )
     }
 
     if (ouvertReglages) {
@@ -189,6 +273,49 @@ fun LauncherScreen() {
 }
 
 @Composable
+fun ActionsAppDialog(
+    app: AppEntry,
+    dansDock: Boolean,
+    dossiers: List<Dossier>,
+    onDock: () -> Unit,
+    onAjouterAuDossier: (String) -> Unit,
+    onFermer: () -> Unit,
+) {
+    var nouveauNom by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onFermer,
+        title = { Text(app.label) },
+        text = {
+            Column {
+                TextButton(onClick = onDock) {
+                    Text(if (dansDock) "Retirer du dock" else "Ajouter au dock", color = Color.White)
+                }
+                dossiers.forEach { d ->
+                    TextButton(onClick = { onAjouterAuDossier(d.nom) }) {
+                        Text("Ajouter au dossier « ${d.nom} »", color = Color.White)
+                    }
+                }
+                OutlinedTextField(
+                    value = nouveauNom,
+                    onValueChange = { nouveauNom = it },
+                    label = { Text("Nouveau dossier") },
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onAjouterAuDossier(nouveauNom) },
+                enabled = nouveauNom.isNotBlank(),
+            ) { Text("Créer") }
+        },
+        dismissButton = {
+            TextButton(onClick = onFermer) { Text("Fermer") }
+        },
+    )
+}
+
+@Composable
 fun ReglagesDialog(
     actuels: Reglages,
     onEnregistrer: (Reglages) -> Unit,
@@ -196,6 +323,7 @@ fun ReglagesDialog(
 ) {
     var colonnes by remember { mutableStateOf(actuels.colonnes.toFloat()) }
     var taille by remember { mutableStateOf(actuels.tailleIcone.toFloat()) }
+    var accent by remember { mutableStateOf(actuels.accent) }
 
     AlertDialog(
         onDismissRequest = onFermer,
@@ -206,11 +334,22 @@ fun ReglagesDialog(
                 Slider(value = colonnes, onValueChange = { colonnes = it }, valueRange = 3f..6f, steps = 2)
                 Text("Taille des icônes : ${taille.toInt()} dp", color = Color.White)
                 Slider(value = taille, onValueChange = { taille = it }, valueRange = 40f..80f)
+                Text("Couleur d'accent", color = Color.White)
+                Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
+                    COULEURS_ACCENT.forEach { (nom, couleur) ->
+                        TextButton(onClick = { accent = couleur }) {
+                            Text(
+                                if (accent == couleur) "● $nom" else nom,
+                                color = Color(couleur),
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt()))
+                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt(), accent))
             }) { Text("Enregistrer") }
         },
         dismissButton = {
@@ -221,7 +360,13 @@ fun ReglagesDialog(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun AppTile(app: AppEntry, taille: Int, onClick: () -> Unit, onLongClick: () -> Unit) {
+fun AppTile(
+    label: String,
+    icone: Drawable,
+    taille: Int,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .padding(6.dp)
@@ -229,12 +374,39 @@ fun AppTile(app: AppEntry, taille: Int, onClick: () -> Unit, onLongClick: () -> 
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Image(
-            bitmap = app.icon.toBitmap(160, 160).asImageBitmap(),
-            contentDescription = app.label,
+            bitmap = icone.toBitmap(160, 160).asImageBitmap(),
+            contentDescription = label,
             modifier = Modifier.size(taille.dp),
         )
         Text(
-            text = app.label,
+            text = label,
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+fun DossierTile(dossier: Dossier, taille: Int, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .padding(6.dp)
+            .combinedClickable(onClick = onClick, onLongClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Column(
+            modifier = Modifier
+                .size(taille.dp)
+                .background(Color(0xFF2A2A2A), RoundedCornerShape(12.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(text = "${dossier.paquets.size}", color = Color.White, style = MaterialTheme.typography.titleMedium)
+        }
+        Text(
+            text = dossier.nom,
             color = Color.White,
             style = MaterialTheme.typography.labelSmall,
             textAlign = TextAlign.Center,

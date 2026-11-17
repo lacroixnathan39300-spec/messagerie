@@ -6,6 +6,15 @@ import android.content.Context
 data class Reglages(
     val colonnes: Int = 4,
     val tailleIcone: Int = 56,
+    val accent: Int = 0xFFE53935.toInt(),
+)
+
+/** Couleurs d'accent proposées. */
+val COULEURS_ACCENT: List<Pair<String, Int>> = listOf(
+    "Rouge" to 0xFFE53935.toInt(),
+    "Bleu" to 0xFF2979FF.toInt(),
+    "Gris" to 0xFF9E9E9E.toInt(),
+    "Blanc" to 0xFFFFFFFF.toInt(),
 )
 
 private const val PREFS_REGLAGES = "nexus_reglages"
@@ -15,6 +24,7 @@ fun chargerReglages(context: Context): Reglages {
     return Reglages(
         colonnes = p.getInt("colonnes", 4).coerceIn(3, 6),
         tailleIcone = p.getInt("tailleIcone", 56).coerceIn(40, 80),
+        accent = p.getInt("accent", 0xFFE53935.toInt()),
     )
 }
 
@@ -23,5 +33,6 @@ fun sauverReglages(context: Context, reglages: Reglages) {
         .edit()
         .putInt("colonnes", reglages.colonnes)
         .putInt("tailleIcone", reglages.tailleIcone)
+        .putInt("accent", reglages.accent)
         .apply()
 }
