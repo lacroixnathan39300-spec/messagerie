@@ -22,7 +22,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -103,6 +106,8 @@ fun LauncherScreen() {
     val context = LocalContext.current
     val apps = remember { loadLaunchableApps(context.packageManager) }
     var dock by remember { mutableStateOf(chargerDock(context)) }
+    var reglages by remember { mutableStateOf(chargerReglages(context)) }
+    var ouvertReglages by remember { mutableStateOf(false) }
     val parPaquet = remember(apps) { apps.associateBy { it.packageName } }
     val appsDuDock = dock.mapNotNull { parPaquet[it] }
 
@@ -112,8 +117,20 @@ fun LauncherScreen() {
             .background(Color.Black)
             .padding(top = 48.dp, bottom = 12.dp),
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(text = "NEXUS ONE", color = Color.White, style = MaterialTheme.typography.titleSmall)
+            TextButton(onClick = { ouvertReglages = true }) {
+                Text(text = "Réglages", color = Color.White)
+            }
+        }
+
         LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
+            columns = GridCells.Fixed(reglages.colonnes),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
@@ -122,6 +139,7 @@ fun LauncherScreen() {
             items(apps, key = { it.packageName }) { app ->
                 AppTile(
                     app = app,
+                    taille = reglages.tailleIcone,
                     onClick = { launchApp(context, app.packageName) },
                     onLongClick = {
                         if (app.packageName in dock) {
@@ -146,6 +164,7 @@ fun LauncherScreen() {
             appsDuDock.forEach { app ->
                 AppTile(
                     app = app,
+                    taille = reglages.tailleIcone,
                     onClick = { launchApp(context, app.packageName) },
                     onLongClick = {
                         dock = dock - app.packageName
@@ -155,11 +174,54 @@ fun LauncherScreen() {
             }
         }
     }
+
+    if (ouvertReglages) {
+        ReglagesDialog(
+            actuels = reglages,
+            onEnregistrer = { nouveaux ->
+                reglages = nouveaux
+                sauverReglages(context, nouveaux)
+                ouvertReglages = false
+            },
+            onFermer = { ouvertReglages = false },
+        )
+    }
+}
+
+@Composable
+fun ReglagesDialog(
+    actuels: Reglages,
+    onEnregistrer: (Reglages) -> Unit,
+    onFermer: () -> Unit,
+) {
+    var colonnes by remember { mutableStateOf(actuels.colonnes.toFloat()) }
+    var taille by remember { mutableStateOf(actuels.tailleIcone.toFloat()) }
+
+    AlertDialog(
+        onDismissRequest = onFermer,
+        title = { Text("Réglages de l'accueil") },
+        text = {
+            Column {
+                Text("Colonnes : ${colonnes.toInt()}", color = Color.White)
+                Slider(value = colonnes, onValueChange = { colonnes = it }, valueRange = 3f..6f, steps = 2)
+                Text("Taille des icônes : ${taille.toInt()} dp", color = Color.White)
+                Slider(value = taille, onValueChange = { taille = it }, valueRange = 40f..80f)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt()))
+            }) { Text("Enregistrer") }
+        },
+        dismissButton = {
+            TextButton(onClick = onFermer) { Text("Annuler") }
+        },
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun AppTile(app: AppEntry, onClick: () -> Unit, onLongClick: () -> Unit) {
+fun AppTile(app: AppEntry, taille: Int, onClick: () -> Unit, onLongClick: () -> Unit) {
     Column(
         modifier = Modifier
             .padding(6.dp)
@@ -167,9 +229,9 @@ fun AppTile(app: AppEntry, onClick: () -> Unit, onLongClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Image(
-            bitmap = app.icon.toBitmap(128, 128).asImageBitmap(),
+            bitmap = app.icon.toBitmap(160, 160).asImageBitmap(),
             contentDescription = app.label,
-            modifier = Modifier.size(56.dp),
+            modifier = Modifier.size(taille.dp),
         )
         Text(
             text = app.label,
