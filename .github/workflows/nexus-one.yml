@@ -1,5 +1,7 @@
 name: "NEXUS ONE : APK de test"
 on:
+  push:
+    branches: [launcher-nexus-one]
   workflow_dispatch:
 jobs:
   build:
