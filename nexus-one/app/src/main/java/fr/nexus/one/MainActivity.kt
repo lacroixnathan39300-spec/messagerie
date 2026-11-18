@@ -16,6 +16,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -137,6 +138,7 @@ fun LauncherScreen() {
     var reglages by remember { mutableStateOf(chargerReglages(context)) }
     var ouvertReglages by remember { mutableStateOf(false) }
     var ouvertPanneau by remember { mutableStateOf(false) }
+    var ouvertGabriel by remember { mutableStateOf(false) }
     var ouvertNotifs by remember { mutableStateOf(false) }
     val notifs by NotifService.notifications.collectAsState()
     val parAppli = notifs.groupingBy { it.paquet }.eachCount()
@@ -183,19 +185,17 @@ fun LauncherScreen() {
                 )
             },
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             Text(text = "NEXUS ONE", color = accent, style = MaterialTheme.typography.titleSmall)
-            Row {
+            Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
                 TextButton(onClick = {
                     if (accesNotificationsAccorde(context)) ouvertNotifs = true
                     else ouvrirReglageAccesNotifications(context)
                 }) {
                     Text(text = "Notifs (${notifs.size})", color = accent)
+                }
+                TextButton(onClick = { ouvertGabriel = true }) {
+                    Text(text = "Gabriel", color = accent)
                 }
                 TextButton(onClick = { ouvertPanneau = true }) {
                     Text(text = "Panneau", color = accent)
@@ -389,6 +389,10 @@ fun LauncherScreen() {
         )
     }
 
+    if (ouvertGabriel) {
+        GabrielDialog(apps = apps, villeMeteo = reglages.villeMeteo, accent = accent, onFermer = { ouvertGabriel = false })
+    }
+
     if (ouvertPanneau) {
         PanneauRapide(accent = accent, onFermer = { ouvertPanneau = false })
     }
@@ -508,7 +512,7 @@ fun BatterieWidget(couleur: Color) {
     )
 }
 
-private fun lireBatterie(context: Context): Pair<Int, Boolean> {
+fun lireBatterie(context: Context): Pair<Int, Boolean> {
     val intent: Intent? = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
     val niveau = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
     val echelle = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
