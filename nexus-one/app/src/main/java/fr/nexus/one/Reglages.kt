@@ -12,6 +12,7 @@ data class Reglages(
     val ordreAZ: Boolean = true,
     val afficherHeure: Boolean = true,
     val villeMeteo: String = "",
+    val afficherBatterie: Boolean = true,
 )
 
 /** Couleurs d'accent proposées. */
@@ -49,6 +50,7 @@ fun chargerReglages(context: Context): Reglages {
         ordreAZ = p.getBoolean("ordreAZ", true),
         afficherHeure = p.getBoolean("afficherHeure", true),
         villeMeteo = p.getString("villeMeteo", "") ?: "",
+        afficherBatterie = p.getBoolean("afficherBatterie", true),
     )
 }
 
@@ -63,5 +65,6 @@ fun sauverReglages(context: Context, reglages: Reglages) {
         .putBoolean("ordreAZ", reglages.ordreAZ)
         .putBoolean("afficherHeure", reglages.afficherHeure)
         .putString("villeMeteo", reglages.villeMeteo)
+        .putBoolean("afficherBatterie", reglages.afficherBatterie)
         .apply()
 }

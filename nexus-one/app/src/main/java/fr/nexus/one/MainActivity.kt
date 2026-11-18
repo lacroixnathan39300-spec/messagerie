@@ -42,6 +42,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.produceState
 import kotlinx.coroutines.delay
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import android.os.BatteryManager
+import android.content.IntentFilter
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import java.text.SimpleDateFormat
@@ -133,6 +138,8 @@ fun LauncherScreen() {
     var appChoisie by remember { mutableStateOf<AppEntry?>(null) }
     var recherche by remember { mutableStateOf("") }
     var dossierOuvert by remember { mutableStateOf<Dossier?>(null) }
+    val focusRecherche = remember { FocusRequester() }
+    val clavier = LocalSoftwareKeyboardController.current
 
     val accent = Color(reglages.accent)
     val paquetsDansDossiers = dossiers.flatMap { it.paquets }.toSet()
@@ -153,13 +160,21 @@ fun LauncherScreen() {
             .fillMaxSize()
             .background(Color(reglages.fond))
             .padding(top = 48.dp, bottom = 12.dp)
-            // Glisser vers le bas de plus de 150 px ouvre les réglages.
+            // Glisser vers le bas ouvre les réglages, vers le haut la recherche.
             .pointerInput(Unit) {
                 var cumul = 0f
                 detectVerticalDragGestures(
                     onDragStart = { cumul = 0f },
                     onVerticalDrag = { _, montant -> cumul += montant },
-                    onDragEnd = { if (cumul > 150f) ouvertReglages = true },
+                    onDragEnd = {
+                        if (cumul > 150f) {
+                            ouvertReglages = true
+                        } else if (cumul < -150f) {
+                            // Glisser vers le haut : place le curseur dans la recherche.
+                            focusRecherche.requestFocus()
+                            clavier?.show()
+                        }
+                    },
                 )
             },
     ) {
@@ -177,6 +192,7 @@ fun LauncherScreen() {
 
         if (reglages.afficherHeure) HorlogeWidget(accent)
         if (reglages.villeMeteo.isNotBlank()) MeteoWidget(reglages.villeMeteo, Color.White)
+        if (reglages.afficherBatterie) BatterieWidget(Color.White)
 
         OutlinedTextField(
             value = recherche,
@@ -185,6 +201,7 @@ fun LauncherScreen() {
             label = { Text("Rechercher une appli", color = Color.White) },
             modifier = Modifier
                 .fillMaxWidth()
+                .focusRequester(focusRecherche)
                 .padding(horizontal = 16.dp),
         )
 
@@ -415,6 +432,34 @@ fun MeteoWidget(ville: String, couleur: Color) {
     )
 }
 
+/** Widget batterie : niveau et charge, mis à jour chaque minute. */
+@Composable
+fun BatterieWidget(couleur: Color) {
+    val context = LocalContext.current
+    val etat by produceState(initialValue = lireBatterie(context)) {
+        while (true) {
+            value = lireBatterie(context)
+            delay(60_000L)
+        }
+    }
+    Text(
+        text = "Batterie : ${etat.first} %" + if (etat.second) " (en charge)" else "",
+        color = couleur,
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+    )
+}
+
+private fun lireBatterie(context: Context): Pair<Int, Boolean> {
+    val intent: Intent? = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+    val niveau = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+    val echelle = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
+    val statut = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+    val enCharge = statut == BatteryManager.BATTERY_STATUS_CHARGING || statut == BatteryManager.BATTERY_STATUS_FULL
+    val pourcent = if (niveau >= 0 && echelle > 0) niveau * 100 / echelle else 0
+    return pourcent to enCharge
+}
+
 @Composable
 fun ReglagesDialog(
     actuels: Reglages,
@@ -429,6 +474,7 @@ fun ReglagesDialog(
     var ordreAZ by remember { mutableStateOf(actuels.ordreAZ) }
     var afficherHeure by remember { mutableStateOf(actuels.afficherHeure) }
     var villeMeteo by remember { mutableStateOf(actuels.villeMeteo) }
+    var afficherBatterie by remember { mutableStateOf(actuels.afficherBatterie) }
 
     AlertDialog(
         onDismissRequest = onFermer,
@@ -449,6 +495,9 @@ fun ReglagesDialog(
                     label = { Text("Ville météo (vide = masqué)") },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                TextButton(onClick = { afficherBatterie = !afficherBatterie }) {
+                    Text(if (afficherBatterie) "Widget batterie : affiché" else "Widget batterie : masqué", color = Color.White)
+                }
                 TextButton(onClick = { afficherHeure = !afficherHeure }) {
                     Text(if (afficherHeure) "Widget heure : affiché" else "Widget heure : masqué", color = Color.White)
                 }
@@ -486,7 +535,7 @@ fun ReglagesDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt(), accent, afficherNoms, fond, ordreAZ, afficherHeure, villeMeteo.trim()))
+                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt(), accent, afficherNoms, fond, ordreAZ, afficherHeure, villeMeteo.trim(), afficherBatterie))
             }) { Text("Enregistrer") }
         },
         dismissButton = {
