@@ -13,6 +13,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -134,7 +136,16 @@ fun LauncherScreen() {
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .padding(top = 48.dp, bottom = 12.dp),
+            .padding(top = 48.dp, bottom = 12.dp)
+            // Glisser vers le bas de plus de 150 px ouvre les réglages.
+            .pointerInput(Unit) {
+                var cumul = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { cumul = 0f },
+                    onVerticalDrag = { _, montant -> cumul += montant },
+                    onDragEnd = { if (cumul > 150f) ouvertReglages = true },
+                )
+            },
     ) {
         Row(
             modifier = Modifier
