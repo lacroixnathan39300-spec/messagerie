@@ -123,13 +123,19 @@ fun LauncherScreen() {
     var reglages by remember { mutableStateOf(chargerReglages(context)) }
     var ouvertReglages by remember { mutableStateOf(false) }
     var appChoisie by remember { mutableStateOf<AppEntry?>(null) }
+    var recherche by remember { mutableStateOf("") }
     var dossierOuvert by remember { mutableStateOf<Dossier?>(null) }
 
     val accent = Color(reglages.accent)
     val paquetsDansDossiers = dossiers.flatMap { it.paquets }.toSet()
+    val requete = recherche.trim()
     val lignes: List<Ligne> =
-        apps.filter { it.packageName !in paquetsDansDossiers }.map { Ligne.Appli(it) } +
-            dossiers.map { Ligne.DossierLigne(it) }
+        if (requete.isEmpty()) {
+            apps.filter { it.packageName !in paquetsDansDossiers }.map { Ligne.Appli(it) } +
+                dossiers.map { Ligne.DossierLigne(it) }
+        } else {
+            apps.filter { it.label.contains(requete, ignoreCase = true) }.map { Ligne.Appli(it) }
+        }
     val appsDuDock = dock.mapNotNull { parPaquet[it] }
 
     Column(
@@ -158,6 +164,16 @@ fun LauncherScreen() {
                 Text(text = "Réglages", color = accent)
             }
         }
+
+        OutlinedTextField(
+            value = recherche,
+            onValueChange = { recherche = it },
+            singleLine = true,
+            label = { Text("Rechercher une appli", color = Color.White) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+        )
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(reglages.colonnes),
