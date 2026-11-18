@@ -5,6 +5,18 @@ plugins {
 }
 
 android {
+    // Clé de TEST fixe : toutes les versions ont la même signature,
+    // donc chaque nouvel APK s'installe par-dessus l'ancien.
+    // Ce n'est pas une clé de publication (mot de passe public).
+    signingConfigs {
+        create("test") {
+            storeFile = file("nexus-test.keystore")
+            storePassword = "nexustest"
+            keyAlias = "nexustest"
+            keyPassword = "nexustest"
+        }
+    }
+
     namespace = "fr.nexus.one"
     compileSdk = 35
 
@@ -12,11 +24,12 @@ android {
         applicationId = "fr.nexus.one"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+        versionName = "0.1." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
 
     buildTypes {
+        getByName("debug") { signingConfig = signingConfigs.getByName("test") }
         release {
             isMinifyEnabled = false
         }

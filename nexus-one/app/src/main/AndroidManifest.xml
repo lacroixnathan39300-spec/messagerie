@@ -30,6 +30,11 @@
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- Icône dans la liste des applis, pour ouvrir NEXUS ONE sans en faire l'accueil -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
         </activity>
         <service
             android:name=".NotifService"
