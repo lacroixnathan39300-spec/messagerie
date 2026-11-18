@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.produceState
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.focus.focusRequester
@@ -139,6 +140,14 @@ fun LauncherScreen() {
     var ouvertReglages by remember { mutableStateOf(false) }
     var ouvertPanneau by remember { mutableStateOf(false) }
     var ouvertGabriel by remember { mutableStateOf(false) }
+    var ouvertRoutines by remember { mutableStateOf(false) }
+    // Routines programmées : vérifiées toutes les 30 secondes tant que le launcher tourne.
+    LaunchedEffect(reglages.villeMeteo) {
+        while (true) {
+            verifierRoutinesProgrammees(context, apps, reglages.villeMeteo)
+            delay(30_000L)
+        }
+    }
     var ouvertNotifs by remember { mutableStateOf(false) }
     val notifs by NotifService.notifications.collectAsState()
     val parAppli = notifs.groupingBy { it.paquet }.eachCount()
@@ -196,6 +205,9 @@ fun LauncherScreen() {
                 }
                 TextButton(onClick = { ouvertGabriel = true }) {
                     Text(text = "Gabriel", color = accent)
+                }
+                TextButton(onClick = { ouvertRoutines = true }) {
+                    Text(text = "Routines", color = accent)
                 }
                 TextButton(onClick = { ouvertPanneau = true }) {
                     Text(text = "Panneau", color = accent)
@@ -391,6 +403,10 @@ fun LauncherScreen() {
 
     if (ouvertGabriel) {
         GabrielDialog(apps = apps, villeMeteo = reglages.villeMeteo, accent = accent, onFermer = { ouvertGabriel = false })
+    }
+
+    if (ouvertRoutines) {
+        RoutinesDialog(apps = apps, villeMeteo = reglages.villeMeteo, accent = accent, onFermer = { ouvertRoutines = false })
     }
 
     if (ouvertPanneau) {
