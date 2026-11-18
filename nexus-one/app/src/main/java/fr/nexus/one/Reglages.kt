@@ -10,6 +10,7 @@ data class Reglages(
     val afficherNoms: Boolean = true,
     val fond: Int = 0xFF000000.toInt(),
     val ordreAZ: Boolean = true,
+    val afficherHeure: Boolean = true,
 )
 
 /** Couleurs d'accent proposées. */
@@ -45,6 +46,7 @@ fun chargerReglages(context: Context): Reglages {
         afficherNoms = p.getBoolean("afficherNoms", true),
         fond = p.getInt("fond", 0xFF000000.toInt()),
         ordreAZ = p.getBoolean("ordreAZ", true),
+        afficherHeure = p.getBoolean("afficherHeure", true),
     )
 }
 
@@ -57,5 +59,6 @@ fun sauverReglages(context: Context, reglages: Reglages) {
         .putBoolean("afficherNoms", reglages.afficherNoms)
         .putInt("fond", reglages.fond)
         .putBoolean("ordreAZ", reglages.ordreAZ)
+        .putBoolean("afficherHeure", reglages.afficherHeure)
         .apply()
 }

@@ -38,6 +38,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Locale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -166,6 +170,8 @@ fun LauncherScreen() {
                 Text(text = "Réglages", color = accent)
             }
         }
+
+        if (reglages.afficherHeure) HorlogeWidget(accent)
 
         OutlinedTextField(
             value = recherche,
@@ -363,6 +369,28 @@ fun ActionsAppDialog(
     )
 }
 
+/** Widget horloge : heure et date, mises à jour toutes les 30 secondes. */
+@Composable
+fun HorlogeWidget(couleur: Color) {
+    val affichage by produceState(initialValue = formaterHeure()) {
+        while (true) {
+            value = formaterHeure()
+            delay(30_000L)
+        }
+    }
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Text(text = affichage.first, color = couleur, style = MaterialTheme.typography.headlineMedium)
+        Text(text = affichage.second, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+private fun formaterHeure(): Pair<String, String> {
+    val maintenant = java.util.Date()
+    val heure = SimpleDateFormat("HH:mm", Locale.FRANCE).format(maintenant)
+    val date = SimpleDateFormat("EEEE d MMMM", Locale.FRANCE).format(maintenant)
+    return heure to date
+}
+
 @Composable
 fun ReglagesDialog(
     actuels: Reglages,
@@ -375,6 +403,7 @@ fun ReglagesDialog(
     var afficherNoms by remember { mutableStateOf(actuels.afficherNoms) }
     var fond by remember { mutableStateOf(actuels.fond) }
     var ordreAZ by remember { mutableStateOf(actuels.ordreAZ) }
+    var afficherHeure by remember { mutableStateOf(actuels.afficherHeure) }
 
     AlertDialog(
         onDismissRequest = onFermer,
@@ -387,6 +416,9 @@ fun ReglagesDialog(
                 Slider(value = taille, onValueChange = { taille = it }, valueRange = 40f..80f)
                 TextButton(onClick = { afficherNoms = !afficherNoms }) {
                     Text(if (afficherNoms) "Noms des applis : affichés" else "Noms des applis : masqués", color = Color.White)
+                }
+                TextButton(onClick = { afficherHeure = !afficherHeure }) {
+                    Text(if (afficherHeure) "Widget heure : affiché" else "Widget heure : masqué", color = Color.White)
                 }
                 TextButton(onClick = { ordreAZ = !ordreAZ }) {
                     Text(if (ordreAZ) "Ordre des applis : A à Z" else "Ordre des applis : Z à A", color = Color.White)
@@ -422,7 +454,7 @@ fun ReglagesDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt(), accent, afficherNoms, fond, ordreAZ))
+                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt(), accent, afficherNoms, fond, ordreAZ, afficherHeure))
             }) { Text("Enregistrer") }
         },
         dismissButton = {
