@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.produceState
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
@@ -136,6 +137,9 @@ fun LauncherScreen() {
     var reglages by remember { mutableStateOf(chargerReglages(context)) }
     var ouvertReglages by remember { mutableStateOf(false) }
     var ouvertPanneau by remember { mutableStateOf(false) }
+    var ouvertNotifs by remember { mutableStateOf(false) }
+    val notifs by NotifService.notifications.collectAsState()
+    val parAppli = notifs.groupingBy { it.paquet }.eachCount()
     var appChoisie by remember { mutableStateOf<AppEntry?>(null) }
     var recherche by remember { mutableStateOf("") }
     var dossierOuvert by remember { mutableStateOf<Dossier?>(null) }
@@ -187,6 +191,12 @@ fun LauncherScreen() {
         ) {
             Text(text = "NEXUS ONE", color = accent, style = MaterialTheme.typography.titleSmall)
             Row {
+                TextButton(onClick = {
+                    if (accesNotificationsAccorde(context)) ouvertNotifs = true
+                    else ouvrirReglageAccesNotifications(context)
+                }) {
+                    Text(text = "Notifs (${notifs.size})", color = accent)
+                }
                 TextButton(onClick = { ouvertPanneau = true }) {
                     Text(text = "Panneau", color = accent)
                 }
@@ -227,6 +237,8 @@ fun LauncherScreen() {
                         afficherNom = reglages.afficherNoms,
                         onClick = { launchApp(context, ligne.app.packageName) },
                         onLongClick = { appChoisie = ligne.app },
+                        pastille = parAppli[ligne.app.packageName] ?: 0,
+                        couleurPastille = accent,
                     )
                     is Ligne.DossierLigne -> DossierTile(
                         dossier = ligne.dossier,
@@ -251,6 +263,8 @@ fun LauncherScreen() {
                     icone = app.icon,
                     taille = reglages.tailleIcone,
                     afficherNom = reglages.afficherNoms,
+                    pastille = parAppli[app.packageName] ?: 0,
+                    couleurPastille = accent,
                     onClick = { launchApp(context, app.packageName) },
                     onLongClick = {
                         dock = dock - app.packageName
@@ -338,6 +352,40 @@ fun LauncherScreen() {
             dismissButton = {
                 TextButton(onClick = { dossierOuvert = null }) { Text("Fermer") }
             },
+        )
+    }
+
+    if (ouvertNotifs) {
+        AlertDialog(
+            onDismissRequest = { ouvertNotifs = false },
+            title = { Text("Notifications") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    if (notifs.isEmpty()) Text("Aucune notification", color = Color.White)
+                    notifs.forEach { n ->
+                        val nomAppli = parPaquet[n.paquet]?.label ?: n.paquet
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TextButton(
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    launchApp(context, n.paquet)
+                                    ouvertNotifs = false
+                                },
+                            ) {
+                                Text("$nomAppli : ${n.titre} ${n.texte}".trim(), color = Color.White, maxLines = 2)
+                            }
+                            TextButton(onClick = { NotifService.effacer(n.cle) }) { Text("X", color = accent) }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { NotifService.toutEffacer() }) { Text("Tout effacer", color = accent) }
+            },
+            dismissButton = { TextButton(onClick = { ouvertNotifs = false }) { Text("Fermer") } },
         )
     }
 
@@ -563,6 +611,8 @@ fun AppTile(
     afficherNom: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    pastille: Int = 0,
+    couleurPastille: Color = Color.Red,
 ) {
     Column(
         modifier = Modifier
@@ -575,6 +625,13 @@ fun AppTile(
             contentDescription = label,
             modifier = Modifier.size(taille.dp),
         )
+        if (pastille > 0) {
+            Text(
+                text = if (pastille > 9) "9+" else pastille.toString(),
+                color = couleurPastille,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
         if (afficherNom) {
             Text(
                 text = label,
