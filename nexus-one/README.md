@@ -1,27 +1,42 @@
-# NEXUS ONE (provisoire)
+# NEXUS ONE (PERSONAL OS)
 
-Launcher Android personnel. Projet en construction, par phases.
+Launcher Android personnel, écrit en Kotlin et Jetpack Compose. Android 8 minimum.
 
-## État actuel : Phase 1 (écrit, NON compilé)
+## État : 10 phases écrites et compilées, PAS ENCORE TESTÉES sur téléphone
 
-- Écran d'accueil qui liste les applis lançables dans une grille de 4 colonnes.
-- Tapotement pour ouvrir une appli.
-- Déclaré comme application d'accueil (HOME) dans le manifeste.
+Chaque version est compilée et publiée automatiquement (GitHub Actions, onglet Releases, `nexus-one-N`).
+Les tests automatiques couvrent seulement quelques fonctions simples (lecture d'heure, codes météo).
+Le comportement à l'écran n'a pas été vérifié sur un vrai téléphone.
 
-**Vérification** : ce code n'a pas encore été compilé. L'environnement de travail n'a pas de SDK Android. La première étape est donc une compilation sur GitHub Actions, puis un test sur téléphone.
+| Phase | Contenu |
+|---|---|
+| 1. Accueil | Grille des applis, lancement, déclaré comme écran d'accueil |
+| 2. Dock, tiroir, dossiers | Dock de 4 applis, recherche, dossiers (créer, ajouter, retirer, supprimer) |
+| 3. Personnalisation | Colonnes, taille des icônes, noms, accent, fond, ordre A-Z, thèmes |
+| 4. Widgets et gestes | Horloge, météo (Open-Meteo, gratuit), batterie ; glisser bas = réglages, haut = recherche |
+| 5. Notifications et panneaux | Pastilles, liste, effacement ; panneau rapide (lampe, Wi-Fi, Bluetooth, volume) |
+| 6. Gabriel | Assistant local à commandes, écrit ou vocal, réponse à voix haute (pas d'IA, pas de serveur) |
+| 7. Automatisations | Routines de commandes Gabriel, manuelles ou chaque jour à heure fixe |
+| 8. Multimédia et voiture | Lecteur (titre, précédent, pause, suivant) ; mode voiture à gros boutons |
+| 9. Profils, sauvegarde, sécurité | Export/import JSON, profils nommés, PIN, applis masquées |
+| 10. Optimisation, tests | Liste des applis mise à jour à l'installation, icônes en cache, tests unitaires |
 
-## Ce qui n'est pas encore fait
+## Commandes de Gabriel
 
-- Dock, tiroir d'applications, dossiers (phase 2)
-- Thèmes, widgets, studio (phases 3 et 4)
-- Notifications, panneaux de commande (phase 5)
-- Assistant Gabriel (phase 6)
-- Automatisations (phase 7)
-- Mode voiture et multimédia (phase 8)
-- Profils, sauvegardes, sécurité (phase 9)
+`ouvre <appli>`, `lampe` / `éteins la lampe`, `heure`, `date`, `batterie`, `météo`,
+`minuteur 10 minutes`, `réveil 7 h 30`, `appelle 0612345678`, `cherche <sujet>`,
+`wifi`, `bluetooth`, `paramètres`, `aide`.
 
-## Limites Android à connaître
+## Autorisations à donner à la première utilisation
 
-- Un launcher ne peut pas modifier les réglages système, sauf droits accordés explicitement (par exemple via ADB pour les réglages sécurisés).
-- Sur les Xiaomi (MIUI, HyperOS), l'optimisation de la batterie peut arrêter les tâches en arrière-plan. Il faudra désactiver cette optimisation pour l'appli.
-- Le verrouillage de l'écran reste géré par Android. L'appli ne le contourne pas.
+- Choisir NEXUS ONE comme application d'accueil (Android le demande en appuyant sur le bouton Accueil).
+- Accès aux notifications : nécessaire pour les pastilles, la liste et le lecteur multimédia.
+  Le bouton « Notifs » ouvre le bon écran.
+
+## Limites Android
+
+- Le launcher ne modifie pas directement le Wi-Fi ou le Bluetooth : Android l'interdit, il ouvre les écrans de réglage.
+- Les routines programmées ne tournent que si le launcher est actif (normalement toujours, c'est l'accueil).
+  Sur Xiaomi (MIUI/HyperOS), désactiver l'optimisation de batterie pour NEXUS ONE.
+- Le PIN protège les réglages et les applis masquées du launcher, pas le téléphone. Le verrouillage reste celui d'Android.
+- Les APK de test sont signés avec une clé de débogage.

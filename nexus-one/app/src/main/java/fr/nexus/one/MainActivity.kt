@@ -44,6 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.produceState
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.DisposableEffect
+import android.content.BroadcastReceiver
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -132,7 +134,22 @@ fun sauverDock(context: Context, paquets: List<String>) {
 @Composable
 fun LauncherScreen() {
     val context = LocalContext.current
-    val apps = remember { loadLaunchableApps(context.packageManager) }
+    // Liste rechargée quand une appli est installée, désinstallée ou mise à jour.
+    var versionApps by remember { mutableStateOf(0) }
+    DisposableEffect(Unit) {
+        val recepteur = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, i: Intent?) { versionApps++ }
+        }
+        val filtre = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addDataScheme("package")
+        }
+        context.registerReceiver(recepteur, filtre)
+        onDispose { context.unregisterReceiver(recepteur) }
+    }
+    val apps = remember(versionApps) { loadLaunchableApps(context.packageManager) }
     val parPaquet = remember(apps) { apps.associateBy { it.packageName } }
 
     var dock by remember { mutableStateOf(chargerDock(context)) }
@@ -685,7 +702,7 @@ fun AppTile(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Image(
-            bitmap = icone.toBitmap(160, 160).asImageBitmap(),
+            bitmap = remember(icone) { icone.toBitmap(160, 160).asImageBitmap() },
             contentDescription = label,
             modifier = Modifier.size(taille.dp),
         )
