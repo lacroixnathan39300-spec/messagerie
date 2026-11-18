@@ -11,6 +11,7 @@ data class Reglages(
     val fond: Int = 0xFF000000.toInt(),
     val ordreAZ: Boolean = true,
     val afficherHeure: Boolean = true,
+    val villeMeteo: String = "",
 )
 
 /** Couleurs d'accent proposées. */
@@ -47,6 +48,7 @@ fun chargerReglages(context: Context): Reglages {
         fond = p.getInt("fond", 0xFF000000.toInt()),
         ordreAZ = p.getBoolean("ordreAZ", true),
         afficherHeure = p.getBoolean("afficherHeure", true),
+        villeMeteo = p.getString("villeMeteo", "") ?: "",
     )
 }
 
@@ -60,5 +62,6 @@ fun sauverReglages(context: Context, reglages: Reglages) {
         .putInt("fond", reglages.fond)
         .putBoolean("ordreAZ", reglages.ordreAZ)
         .putBoolean("afficherHeure", reglages.afficherHeure)
+        .putString("villeMeteo", reglages.villeMeteo)
         .apply()
 }

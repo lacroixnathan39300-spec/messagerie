@@ -15,6 +15,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.produceState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import java.text.SimpleDateFormat
 import java.util.Locale
 import androidx.compose.ui.Modifier
@@ -172,6 +176,7 @@ fun LauncherScreen() {
         }
 
         if (reglages.afficherHeure) HorlogeWidget(accent)
+        if (reglages.villeMeteo.isNotBlank()) MeteoWidget(reglages.villeMeteo, Color.White)
 
         OutlinedTextField(
             value = recherche,
@@ -391,6 +396,25 @@ private fun formaterHeure(): Pair<String, String> {
     return heure to date
 }
 
+/** Widget météo : ville choisie dans les réglages, mise à jour toutes les 30 minutes. */
+@Composable
+fun MeteoWidget(ville: String, couleur: Color) {
+    val meteo by produceState<MeteoActuelle?>(initialValue = null, ville) {
+        while (true) {
+            value = withContext(Dispatchers.IO) { chargerMeteo(ville) }
+            delay(30 * 60_000L)
+        }
+    }
+    val texte = meteo?.let { "${it.ville} : ${Math.round(it.temperature)} °C, ${it.description}" }
+        ?: "Météo de $ville : indisponible"
+    Text(
+        text = texte,
+        color = couleur,
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+    )
+}
+
 @Composable
 fun ReglagesDialog(
     actuels: Reglages,
@@ -404,12 +428,13 @@ fun ReglagesDialog(
     var fond by remember { mutableStateOf(actuels.fond) }
     var ordreAZ by remember { mutableStateOf(actuels.ordreAZ) }
     var afficherHeure by remember { mutableStateOf(actuels.afficherHeure) }
+    var villeMeteo by remember { mutableStateOf(actuels.villeMeteo) }
 
     AlertDialog(
         onDismissRequest = onFermer,
         title = { Text("Réglages de l'accueil") },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text("Colonnes : ${colonnes.toInt()}", color = Color.White)
                 Slider(value = colonnes, onValueChange = { colonnes = it }, valueRange = 3f..6f, steps = 2)
                 Text("Taille des icônes : ${taille.toInt()} dp", color = Color.White)
@@ -417,6 +442,13 @@ fun ReglagesDialog(
                 TextButton(onClick = { afficherNoms = !afficherNoms }) {
                     Text(if (afficherNoms) "Noms des applis : affichés" else "Noms des applis : masqués", color = Color.White)
                 }
+                OutlinedTextField(
+                    value = villeMeteo,
+                    onValueChange = { villeMeteo = it },
+                    singleLine = true,
+                    label = { Text("Ville météo (vide = masqué)") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 TextButton(onClick = { afficherHeure = !afficherHeure }) {
                     Text(if (afficherHeure) "Widget heure : affiché" else "Widget heure : masqué", color = Color.White)
                 }
@@ -454,7 +486,7 @@ fun ReglagesDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt(), accent, afficherNoms, fond, ordreAZ, afficherHeure))
+                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt(), accent, afficherNoms, fond, ordreAZ, afficherHeure, villeMeteo.trim()))
             }) { Text("Enregistrer") }
         },
         dismissButton = {
