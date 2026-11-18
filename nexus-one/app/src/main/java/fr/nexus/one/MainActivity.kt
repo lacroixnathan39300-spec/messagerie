@@ -131,7 +131,9 @@ fun LauncherScreen() {
     val requete = recherche.trim()
     val lignes: List<Ligne> =
         if (requete.isEmpty()) {
-            apps.filter { it.packageName !in paquetsDansDossiers }.map { Ligne.Appli(it) } +
+            apps.filter { it.packageName !in paquetsDansDossiers }
+                .let { if (reglages.ordreAZ) it.sortedBy { a -> a.label.lowercase() } else it.sortedByDescending { a -> a.label.lowercase() } }
+                .map { Ligne.Appli(it) } +
                 dossiers.map { Ligne.DossierLigne(it) }
         } else {
             apps.filter { it.label.contains(requete, ignoreCase = true) }.map { Ligne.Appli(it) }
@@ -372,6 +374,7 @@ fun ReglagesDialog(
     var accent by remember { mutableStateOf(actuels.accent) }
     var afficherNoms by remember { mutableStateOf(actuels.afficherNoms) }
     var fond by remember { mutableStateOf(actuels.fond) }
+    var ordreAZ by remember { mutableStateOf(actuels.ordreAZ) }
 
     AlertDialog(
         onDismissRequest = onFermer,
@@ -384,6 +387,9 @@ fun ReglagesDialog(
                 Slider(value = taille, onValueChange = { taille = it }, valueRange = 40f..80f)
                 TextButton(onClick = { afficherNoms = !afficherNoms }) {
                     Text(if (afficherNoms) "Noms des applis : affichés" else "Noms des applis : masqués", color = Color.White)
+                }
+                TextButton(onClick = { ordreAZ = !ordreAZ }) {
+                    Text(if (ordreAZ) "Ordre des applis : A à Z" else "Ordre des applis : Z à A", color = Color.White)
                 }
                 Text("Couleur de fond", color = Color.White)
                 Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
@@ -408,7 +414,7 @@ fun ReglagesDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt(), accent, afficherNoms, fond))
+                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt(), accent, afficherNoms, fond, ordreAZ))
             }) { Text("Enregistrer") }
         },
         dismissButton = {

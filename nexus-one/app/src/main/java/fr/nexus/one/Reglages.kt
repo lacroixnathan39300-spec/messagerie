@@ -9,6 +9,7 @@ data class Reglages(
     val accent: Int = 0xFFE53935.toInt(),
     val afficherNoms: Boolean = true,
     val fond: Int = 0xFF000000.toInt(),
+    val ordreAZ: Boolean = true,
 )
 
 /** Couleurs d'accent proposées. */
@@ -36,6 +37,7 @@ fun chargerReglages(context: Context): Reglages {
         accent = p.getInt("accent", 0xFFE53935.toInt()),
         afficherNoms = p.getBoolean("afficherNoms", true),
         fond = p.getInt("fond", 0xFF000000.toInt()),
+        ordreAZ = p.getBoolean("ordreAZ", true),
     )
 }
 
@@ -47,5 +49,6 @@ fun sauverReglages(context: Context, reglages: Reglages) {
         .putInt("accent", reglages.accent)
         .putBoolean("afficherNoms", reglages.afficherNoms)
         .putInt("fond", reglages.fond)
+        .putBoolean("ordreAZ", reglages.ordreAZ)
         .apply()
 }
