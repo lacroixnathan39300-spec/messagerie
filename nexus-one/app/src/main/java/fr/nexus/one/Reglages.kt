@@ -7,6 +7,7 @@ data class Reglages(
     val colonnes: Int = 4,
     val tailleIcone: Int = 56,
     val accent: Int = 0xFFE53935.toInt(),
+    val afficherNoms: Boolean = true,
 )
 
 /** Couleurs d'accent proposées. */
@@ -25,6 +26,7 @@ fun chargerReglages(context: Context): Reglages {
         colonnes = p.getInt("colonnes", 4).coerceIn(3, 6),
         tailleIcone = p.getInt("tailleIcone", 56).coerceIn(40, 80),
         accent = p.getInt("accent", 0xFFE53935.toInt()),
+        afficherNoms = p.getBoolean("afficherNoms", true),
     )
 }
 
@@ -34,5 +36,6 @@ fun sauverReglages(context: Context, reglages: Reglages) {
         .putInt("colonnes", reglages.colonnes)
         .putInt("tailleIcone", reglages.tailleIcone)
         .putInt("accent", reglages.accent)
+        .putBoolean("afficherNoms", reglages.afficherNoms)
         .apply()
 }

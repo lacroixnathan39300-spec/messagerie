@@ -188,6 +188,7 @@ fun LauncherScreen() {
                         label = ligne.app.label,
                         icone = ligne.app.icon,
                         taille = reglages.tailleIcone,
+                        afficherNom = reglages.afficherNoms,
                         onClick = { launchApp(context, ligne.app.packageName) },
                         onLongClick = { appChoisie = ligne.app },
                     )
@@ -213,6 +214,7 @@ fun LauncherScreen() {
                     label = app.label,
                     icone = app.icon,
                     taille = reglages.tailleIcone,
+                    afficherNom = reglages.afficherNoms,
                     onClick = { launchApp(context, app.packageName) },
                     onLongClick = {
                         dock = dock - app.packageName
@@ -351,6 +353,7 @@ fun ReglagesDialog(
     var colonnes by remember { mutableStateOf(actuels.colonnes.toFloat()) }
     var taille by remember { mutableStateOf(actuels.tailleIcone.toFloat()) }
     var accent by remember { mutableStateOf(actuels.accent) }
+    var afficherNoms by remember { mutableStateOf(actuels.afficherNoms) }
 
     AlertDialog(
         onDismissRequest = onFermer,
@@ -361,6 +364,9 @@ fun ReglagesDialog(
                 Slider(value = colonnes, onValueChange = { colonnes = it }, valueRange = 3f..6f, steps = 2)
                 Text("Taille des icônes : ${taille.toInt()} dp", color = Color.White)
                 Slider(value = taille, onValueChange = { taille = it }, valueRange = 40f..80f)
+                TextButton(onClick = { afficherNoms = !afficherNoms }) {
+                    Text(if (afficherNoms) "Noms des applis : affichés" else "Noms des applis : masqués", color = Color.White)
+                }
                 Text("Couleur d'accent", color = Color.White)
                 Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
                     COULEURS_ACCENT.forEach { (nom, couleur) ->
@@ -376,7 +382,7 @@ fun ReglagesDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt(), accent))
+                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt(), accent, afficherNoms))
             }) { Text("Enregistrer") }
         },
         dismissButton = {
@@ -391,6 +397,7 @@ fun AppTile(
     label: String,
     icone: Drawable,
     taille: Int,
+    afficherNom: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
@@ -405,13 +412,15 @@ fun AppTile(
             contentDescription = label,
             modifier = Modifier.size(taille.dp),
         )
-        Text(
-            text = label,
-            color = Color.White,
-            style = MaterialTheme.typography.labelSmall,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-        )
+        if (afficherNom) {
+            Text(
+                text = label,
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+        }
     }
 }
 
