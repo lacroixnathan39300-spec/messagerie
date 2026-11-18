@@ -8,6 +8,7 @@ data class Reglages(
     val tailleIcone: Int = 56,
     val accent: Int = 0xFFE53935.toInt(),
     val afficherNoms: Boolean = true,
+    val fond: Int = 0xFF000000.toInt(),
 )
 
 /** Couleurs d'accent proposées. */
@@ -16,6 +17,13 @@ val COULEURS_ACCENT: List<Pair<String, Int>> = listOf(
     "Bleu" to 0xFF2979FF.toInt(),
     "Gris" to 0xFF9E9E9E.toInt(),
     "Blanc" to 0xFFFFFFFF.toInt(),
+)
+
+/** Couleurs de fond proposées pour l'accueil. */
+val COULEURS_FOND: List<Pair<String, Int>> = listOf(
+    "Noir" to 0xFF000000.toInt(),
+    "Gris" to 0xFF1C1C1E.toInt(),
+    "Bleu nuit" to 0xFF0B1A2E.toInt(),
 )
 
 private const val PREFS_REGLAGES = "nexus_reglages"
@@ -27,6 +35,7 @@ fun chargerReglages(context: Context): Reglages {
         tailleIcone = p.getInt("tailleIcone", 56).coerceIn(40, 80),
         accent = p.getInt("accent", 0xFFE53935.toInt()),
         afficherNoms = p.getBoolean("afficherNoms", true),
+        fond = p.getInt("fond", 0xFF000000.toInt()),
     )
 }
 
@@ -37,5 +46,6 @@ fun sauverReglages(context: Context, reglages: Reglages) {
         .putInt("tailleIcone", reglages.tailleIcone)
         .putInt("accent", reglages.accent)
         .putBoolean("afficherNoms", reglages.afficherNoms)
+        .putInt("fond", reglages.fond)
         .apply()
 }

@@ -141,7 +141,7 @@ fun LauncherScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Color(reglages.fond))
             .padding(top = 48.dp, bottom = 12.dp)
             // Glisser vers le bas de plus de 150 px ouvre les réglages.
             .pointerInput(Unit) {
@@ -371,6 +371,7 @@ fun ReglagesDialog(
     var taille by remember { mutableStateOf(actuels.tailleIcone.toFloat()) }
     var accent by remember { mutableStateOf(actuels.accent) }
     var afficherNoms by remember { mutableStateOf(actuels.afficherNoms) }
+    var fond by remember { mutableStateOf(actuels.fond) }
 
     AlertDialog(
         onDismissRequest = onFermer,
@@ -383,6 +384,14 @@ fun ReglagesDialog(
                 Slider(value = taille, onValueChange = { taille = it }, valueRange = 40f..80f)
                 TextButton(onClick = { afficherNoms = !afficherNoms }) {
                     Text(if (afficherNoms) "Noms des applis : affichés" else "Noms des applis : masqués", color = Color.White)
+                }
+                Text("Couleur de fond", color = Color.White)
+                Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
+                    COULEURS_FOND.forEach { (nom, couleur) ->
+                        TextButton(onClick = { fond = couleur }) {
+                            Text(if (fond == couleur) "● $nom" else nom, color = Color.White)
+                        }
+                    }
                 }
                 Text("Couleur d'accent", color = Color.White)
                 Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
@@ -399,7 +408,7 @@ fun ReglagesDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt(), accent, afficherNoms))
+                onEnregistrer(Reglages(colonnes.toInt(), taille.toInt(), accent, afficherNoms, fond))
             }) { Text("Enregistrer") }
         },
         dismissButton = {
