@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -141,6 +142,7 @@ fun LauncherScreen() {
     var ouvertPanneau by remember { mutableStateOf(false) }
     var ouvertGabriel by remember { mutableStateOf(false) }
     var ouvertRoutines by remember { mutableStateOf(false) }
+    var modeVoiture by remember { mutableStateOf(false) }
     // Routines programmées : vérifiées toutes les 30 secondes tant que le launcher tourne.
     LaunchedEffect(reglages.villeMeteo) {
         while (true) {
@@ -171,6 +173,17 @@ fun LauncherScreen() {
         }
     val appsDuDock = dock.mapNotNull { parPaquet[it] }
 
+    if (modeVoiture) {
+        Box(modifier = Modifier.fillMaxSize().background(Color(reglages.fond))) {
+            ModeVoiture(
+                apps = apps,
+                fond = Color(reglages.fond),
+                accent = accent,
+                onGabriel = { ouvertGabriel = true },
+                onQuitter = { modeVoiture = false },
+            )
+        }
+    } else {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -206,6 +219,9 @@ fun LauncherScreen() {
                 TextButton(onClick = { ouvertGabriel = true }) {
                     Text(text = "Gabriel", color = accent)
                 }
+                TextButton(onClick = { modeVoiture = true }) {
+                    Text(text = "Voiture", color = accent)
+                }
                 TextButton(onClick = { ouvertRoutines = true }) {
                     Text(text = "Routines", color = accent)
                 }
@@ -221,6 +237,7 @@ fun LauncherScreen() {
         if (reglages.afficherHeure) HorlogeWidget(accent)
         if (reglages.villeMeteo.isNotBlank()) MeteoWidget(reglages.villeMeteo, Color.White)
         if (reglages.afficherBatterie) BatterieWidget(Color.White)
+        LecteurWidget(accent)
 
         OutlinedTextField(
             value = recherche,
@@ -285,6 +302,8 @@ fun LauncherScreen() {
                 )
             }
         }
+    }
+
     }
 
     appChoisie?.let { app ->
