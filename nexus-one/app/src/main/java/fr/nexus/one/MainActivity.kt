@@ -143,6 +143,11 @@ fun LauncherScreen() {
     var ouvertGabriel by remember { mutableStateOf(false) }
     var ouvertRoutines by remember { mutableStateOf(false) }
     var modeVoiture by remember { mutableStateOf(false) }
+    var ouvertSauvegarde by remember { mutableStateOf(false) }
+    var masquees by remember { mutableStateOf(chargerMasquees(context)) }
+    // Action protégée par le PIN en attente de validation.
+    var actionProtegee by remember { mutableStateOf<(() -> Unit)?>(null) }
+    fun proteger(action: () -> Unit) { if (pinDefini(context)) actionProtegee = action else action() }
     // Routines programmées : vérifiées toutes les 30 secondes tant que le launcher tourne.
     LaunchedEffect(reglages.villeMeteo) {
         while (true) {
@@ -164,12 +169,12 @@ fun LauncherScreen() {
     val requete = recherche.trim()
     val lignes: List<Ligne> =
         if (requete.isEmpty()) {
-            apps.filter { it.packageName !in paquetsDansDossiers }
+            apps.filter { it.packageName !in paquetsDansDossiers && it.packageName !in masquees }
                 .let { if (reglages.ordreAZ) it.sortedBy { a -> a.label.lowercase() } else it.sortedByDescending { a -> a.label.lowercase() } }
                 .map { Ligne.Appli(it) } +
                 dossiers.map { Ligne.DossierLigne(it) }
         } else {
-            apps.filter { it.label.contains(requete, ignoreCase = true) }.map { Ligne.Appli(it) }
+            apps.filter { it.label.contains(requete, ignoreCase = true) && it.packageName !in masquees }.map { Ligne.Appli(it) }
         }
     val appsDuDock = dock.mapNotNull { parPaquet[it] }
 
@@ -197,7 +202,7 @@ fun LauncherScreen() {
                     onVerticalDrag = { _, montant -> cumul += montant },
                     onDragEnd = {
                         if (cumul > 150f) {
-                            ouvertReglages = true
+                            proteger { ouvertReglages = true }
                         } else if (cumul < -150f) {
                             // Glisser vers le haut : place le curseur dans la recherche.
                             focusRecherche.requestFocus()
@@ -228,7 +233,10 @@ fun LauncherScreen() {
                 TextButton(onClick = { ouvertPanneau = true }) {
                     Text(text = "Panneau", color = accent)
                 }
-                TextButton(onClick = { ouvertReglages = true }) {
+                TextButton(onClick = { proteger { ouvertSauvegarde = true } }) {
+                    Text(text = "Profils", color = accent)
+                }
+                TextButton(onClick = { proteger { ouvertReglages = true } }) {
                     Text(text = "Réglages", color = accent)
                 }
             }
@@ -337,6 +345,13 @@ fun LauncherScreen() {
                 appChoisie = null
             },
             onFermer = { appChoisie = null },
+            onMasquer = {
+                masquees = masquees + app.packageName
+                sauverMasquees(context, masquees)
+                dock = dock - app.packageName
+                sauverDock(context, dock)
+                appChoisie = null
+            },
         )
     }
 
@@ -428,6 +443,14 @@ fun LauncherScreen() {
         RoutinesDialog(apps = apps, villeMeteo = reglages.villeMeteo, accent = accent, onFermer = { ouvertRoutines = false })
     }
 
+    if (ouvertSauvegarde) {
+        SauvegardeDialog(apps = apps, accent = accent, onFermer = { ouvertSauvegarde = false })
+    }
+
+    actionProtegee?.let { action ->
+        DemandePin(accent = accent, onOk = { actionProtegee = null; action() }, onFermer = { actionProtegee = null })
+    }
+
     if (ouvertPanneau) {
         PanneauRapide(accent = accent, onFermer = { ouvertPanneau = false })
     }
@@ -453,6 +476,7 @@ fun ActionsAppDialog(
     onDock: () -> Unit,
     onAjouterAuDossier: (String) -> Unit,
     onFermer: () -> Unit,
+    onMasquer: () -> Unit = {},
 ) {
     var nouveauNom by remember { mutableStateOf("") }
     AlertDialog(
@@ -463,6 +487,7 @@ fun ActionsAppDialog(
                 TextButton(onClick = onDock) {
                     Text(if (dansDock) "Retirer du dock" else "Ajouter au dock", color = Color.White)
                 }
+                TextButton(onClick = onMasquer) { Text("Masquer cette appli", color = Color.White) }
                 dossiers.forEach { d ->
                     TextButton(onClick = { onAjouterAuDossier(d.nom) }) {
                         Text("Ajouter au dossier « ${d.nom} »", color = Color.White)
