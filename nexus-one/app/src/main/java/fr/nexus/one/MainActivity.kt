@@ -267,10 +267,27 @@ fun LauncherScreen() {
             text = {
                 Column {
                     actuel.paquets.mapNotNull { parPaquet[it] }.forEach { app ->
-                        TextButton(onClick = {
-                            launchApp(context, app.packageName)
-                            dossierOuvert = null
-                        }) { Text(app.label, color = Color.White) }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            TextButton(
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    launchApp(context, app.packageName)
+                                    dossierOuvert = null
+                                },
+                            ) { Text(app.label, color = Color.White) }
+                            // Retire l'appli du dossier : elle revient sur l'accueil.
+                            TextButton(onClick = {
+                                dossiers = dossiers.map { d ->
+                                    if (d.nom == actuel.nom) d.copy(paquets = d.paquets - app.packageName) else d
+                                }.filter { it.paquets.isNotEmpty() }
+                                sauverDossiers(context, dossiers)
+                                if (dossiers.none { it.nom == actuel.nom }) dossierOuvert = null
+                            }) { Text("Retirer", color = accent) }
+                        }
                     }
                 }
             },
