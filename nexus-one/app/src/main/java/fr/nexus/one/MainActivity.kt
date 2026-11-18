@@ -135,6 +135,7 @@ fun LauncherScreen() {
     var dossiers by remember { mutableStateOf(chargerDossiers(context)) }
     var reglages by remember { mutableStateOf(chargerReglages(context)) }
     var ouvertReglages by remember { mutableStateOf(false) }
+    var ouvertPanneau by remember { mutableStateOf(false) }
     var appChoisie by remember { mutableStateOf<AppEntry?>(null) }
     var recherche by remember { mutableStateOf("") }
     var dossierOuvert by remember { mutableStateOf<Dossier?>(null) }
@@ -185,8 +186,13 @@ fun LauncherScreen() {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(text = "NEXUS ONE", color = accent, style = MaterialTheme.typography.titleSmall)
-            TextButton(onClick = { ouvertReglages = true }) {
-                Text(text = "Réglages", color = accent)
+            Row {
+                TextButton(onClick = { ouvertPanneau = true }) {
+                    Text(text = "Panneau", color = accent)
+                }
+                TextButton(onClick = { ouvertReglages = true }) {
+                    Text(text = "Réglages", color = accent)
+                }
             }
         }
 
@@ -333,6 +339,10 @@ fun LauncherScreen() {
                 TextButton(onClick = { dossierOuvert = null }) { Text("Fermer") }
             },
         )
+    }
+
+    if (ouvertPanneau) {
+        PanneauRapide(accent = accent, onFermer = { ouvertPanneau = false })
     }
 
     if (ouvertReglages) {
