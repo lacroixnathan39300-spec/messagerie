@@ -27,6 +27,13 @@ val COULEURS_FOND: List<Pair<String, Int>> = listOf(
     "Bleu nuit" to 0xFF0B1A2E.toInt(),
 )
 
+/** Thèmes prêts à l'emploi : fond et couleur d'accent réglés ensemble. */
+val THEMES: List<Triple<String, Int, Int>> = listOf(
+    Triple("Sombre", 0xFF000000.toInt(), 0xFFE53935.toInt()),
+    Triple("Nuit", 0xFF0B1A2E.toInt(), 0xFF2979FF.toInt()),
+    Triple("Gris", 0xFF1C1C1E.toInt(), 0xFF9E9E9E.toInt()),
+)
+
 private const val PREFS_REGLAGES = "nexus_reglages"
 
 fun chargerReglages(context: Context): Reglages {

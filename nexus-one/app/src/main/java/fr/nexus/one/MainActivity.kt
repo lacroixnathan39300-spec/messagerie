@@ -391,6 +391,14 @@ fun ReglagesDialog(
                 TextButton(onClick = { ordreAZ = !ordreAZ }) {
                     Text(if (ordreAZ) "Ordre des applis : A à Z" else "Ordre des applis : Z à A", color = Color.White)
                 }
+                Text("Thème", color = Color.White)
+                Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
+                    THEMES.forEach { (nom, theFond, theAccent) ->
+                        TextButton(onClick = { fond = theFond; accent = theAccent }) {
+                            Text(nom, color = Color.White)
+                        }
+                    }
+                }
                 Text("Couleur de fond", color = Color.White)
                 Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
                     COULEURS_FOND.forEach { (nom, couleur) ->
