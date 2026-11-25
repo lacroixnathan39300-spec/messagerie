@@ -26,6 +26,7 @@ public class MainActivity extends Activity {
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
                 .build();
 
+        WebView.setWebContentsDebuggingEnabled(true);  // débogage : chrome://inspect sur un PC
         web = new WebView(this);
         WebSettings reglages = web.getSettings();
         reglages.setJavaScriptEnabled(true);   // Pyodide (Python dans le navigateur)

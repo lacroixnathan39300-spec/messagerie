@@ -48,6 +48,8 @@ async function demarrer() {
     // Refusé dans certains hébergements : l'appli marche quand même, seulement sans cache hors connexion.
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
+  window.addEventListener("resize", () => { ajusterCarte(); rendre(); });
+  setTimeout(() => { ajusterCarte(); rendre(); }, 500);
   setInterval(() => { if (enCours) avancer(); }, 1000);  // 1 seconde = 1 tour (1 jour) à la vitesse ×1
   setInterval(() => { localStorage.setItem(CLE_SAUVEGARDE, py.runPython("moteur.sauver()")); }, 30000);
 }
@@ -72,8 +74,11 @@ function construireFond(texte) {
 
 function ajusterCarte() {
   const canvas = $("carte");
-  canvas.width = canvas.clientWidth * devicePixelRatio;
-  canvas.height = canvas.clientHeight * devicePixelRatio;
+  const largeur = $("carte-wrap").clientWidth, hauteur = $("carte-wrap").clientHeight;
+  canvas.style.width = largeur + "px";
+  canvas.style.height = hauteur + "px";
+  canvas.width = largeur * devicePixelRatio;
+  canvas.height = hauteur * devicePixelRatio;
   zoomCarte = canvas.width / LARGEUR_TERRE;
   decalage = { x: 0, y: (canvas.height - HAUTEUR_TERRE * zoomCarte) / 2 };
 }
