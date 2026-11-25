@@ -62,3 +62,16 @@ Le fichier reste sur l'appareil, sans connexion. Sur Android, donner le chemin d
 - `tests/` : tests automatiques
 
 Le moteur de jeu graphique (Godot) n'est pas encore branché.
+
+## Jouer sur téléphone (application web)
+
+Le moteur tourne dans le navigateur grâce à Pyodide (Python compilé en WebAssembly).
+
+1. Récupérer Pyodide : `npm pack pyodide`, puis `tar -xzf pyodide-*.tgz` (un dossier `package/`).
+2. Assembler l'appli : `python3 tools/construire_app.py <dossier package/>` (crée `app/dist/`).
+3. Servir le dossier `app/dist/` en HTTPS (par exemple GitHub Pages) et l'ouvrir sur le téléphone.
+   Sur Android, Chrome propose « Ajouter à l'écran d'accueil » pour une icône d'appli.
+
+Les sauvegardes sont stockées dans le navigateur du téléphone (localStorage), toutes les 30 secondes et sur demande.
+
+Un APK n'est pas produit par ce dépôt : il faut le SDK Android. Une fois l'appli hébergée, un APK « enveloppe » (Trusted Web Activity, outil Bubblewrap) peut la reprendre.

@@ -1,0 +1,244 @@
+// Interface de Terre vivante : le moteur Python tourne dans le navigateur (Pyodide).
+import { loadPyodide } from "./pyodide/pyodide.mjs";
+
+const $ = (id) => document.getElementById(id);
+const CLE_SAUVEGARDE = "terre-vivante-partie";
+const LARGEUR_TERRE = 720, HAUTEUR_TERRE = 360;
+const COULEURS_ALTITUDE = [
+  [120,170,90],[135,180,95],[160,185,100],[185,185,110],[195,175,115],
+  [180,150,105],[160,130,95],[140,115,95],[200,195,190],[250,250,250]];
+const COULEURS_ZONE = {
+  0: [232,232,220], 1: [90,90,95], 2: [210,120,80], 3: [150,150,170], 4: [110,110,130],
+  5: [200,220,140], 6: [60,60,60], 7: [240,200,60], 8: [150,120,100] };
+const MER = [150, 190, 220];
+
+let py, etat = null, enCours = false, zoomCarte = 1, decalage = { x: 0, y: 0 };
+let fondTerre = null, dernierClic = null;
+
+function appeler(expression) {
+  return JSON.parse(py.runPython(`import json, moteur\njson.dumps(${expression})`));
+}
+
+async function demarrer() {
+  py = await loadPyodide({ indexURL: "./pyodide/" });
+  py.FS.mkdirTree("/app");
+  const fichiers = await (await fetch("fichiers.json")).json();
+  for (const f of fichiers) {
+    const pos = f.lastIndexOf("/");
+    if (pos > 0) py.FS.mkdirTree("/app/" + f.slice(0, pos));
+    py.FS.writeFile("/app/" + f, await (await fetch(f)).text());
+  }
+  py.runPython("import sys\nsys.path.insert(0, '/app')\nimport moteur");
+  fondTerre = construireFond(py.FS.readFile("/app/terre/donnees/terre_0_5deg.txt", { encoding: "utf8" }));
+
+  const sauve = localStorage.getItem(CLE_SAUVEGARDE);
+  if (sauve) {
+    py.globals.set("texte_entree", sauve);
+    etat = JSON.parse(py.runPython("import json, moteur\njson.dumps(moteur.charger_texte(texte_entree))"));
+  } else {
+    etat = appeler("moteur.nouvelle_partie(1)");
+  }
+  window.terreVivante = { etat: () => etat };  // pour les tests automatiques
+  $("pret").style.display = "none";
+  $("jeu").style.display = "block";
+  ajusterCarte();
+  rendre();
+  lier();
+  if ("serviceWorker" in navigator) {
+    // Refusé dans certains hébergements : l'appli marche quand même, seulement sans cache hors connexion.
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+  setInterval(() => { if (enCours) avancer(); }, 250);
+  setInterval(() => { localStorage.setItem(CLE_SAUVEGARDE, py.runPython("moteur.sauver()")); }, 30000);
+}
+
+function construireFond(texte) {
+  const lignes = texte.split("\n").filter((l) => l.length);
+  const c = document.createElement("canvas");
+  c.width = LARGEUR_TERRE; c.height = HAUTEUR_TERRE;
+  const ctx = c.getContext("2d");
+  const img = ctx.createImageData(LARGEUR_TERRE, HAUTEUR_TERRE);
+  for (let j = 0; j < HAUTEUR_TERRE; j++) {
+    for (let i = 0; i < LARGEUR_TERRE; i++) {
+      const car = lignes[j][i];
+      const [r, g, b] = car === "." ? MER : COULEURS_ALTITUDE[Number(car)];
+      const k = (j * LARGEUR_TERRE + i) * 4;
+      img.data[k] = r; img.data[k + 1] = g; img.data[k + 2] = b; img.data[k + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
+function ajusterCarte() {
+  const canvas = $("carte");
+  canvas.width = canvas.clientWidth * devicePixelRatio;
+  canvas.height = canvas.clientHeight * devicePixelRatio;
+  zoomCarte = canvas.width / LARGEUR_TERRE;
+  decalage = { x: 0, y: (canvas.height - HAUTEUR_TERRE * zoomCarte) / 2 };
+}
+
+function rendre() {
+  if (!etat) return;
+  const b = etat.bilan;
+  $("tour").textContent = b.tour;
+  $("epoque").textContent = b.epoque;
+  $("vivants").textContent = b.vivantes;
+  $("morts").textContent = b.morts;
+  $("peuples").textContent = b.peuples;
+  $("lecture").textContent = enCours ? "⏸ Pause" : "▶ Lancer";
+  dessinerCarte();
+  afficherPrieres();
+  afficherEnergie();
+  afficherChronique();
+}
+
+function dessinerCarte() {
+  const canvas = $("carte");
+  const ctx = canvas.getContext("2d");
+  const s = zoomCarte;
+  ctx.fillStyle = "#0b1220";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(fondTerre, decalage.x, decalage.y, LARGEUR_TERRE * s, HAUTEUR_TERRE * s);
+  ctx.fillStyle = "#3d8b37";
+  for (const [x, y] of etat.buissons) {
+    ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s * 0.8), Math.max(1, s * 0.8));
+  }
+  const enPriere = new Set(etat.prieres.map((p) => p.auteur));
+  for (const p of etat.personnes) {
+    const cx = decalage.x + p.x * s, cy = decalage.y + p.y * s;
+    if (enPriere.has(p.id)) {
+      ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, Math.max(4, s * 2.5), 0, 2 * Math.PI); ctx.stroke();
+    }
+    ctx.fillStyle = p.schismatique ? "#b91c1c" : "#1d4ed8";
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(2.5, s * 1.5), 0, 2 * Math.PI); ctx.fill();
+  }
+}
+
+function afficherPrieres() {
+  const zone = $("prieres");
+  if (!etat.prieres.length) { zone.textContent = "Aucune prière pour l'instant."; return; }
+  zone.innerHTML = "";
+  for (const p of etat.prieres) {
+    const div = document.createElement("div");
+    div.className = "priere";
+    div.innerHTML = `<div>Personne n°${p.auteur} : « ${p.texte} »</div><div class="boutons"></div>`;
+    for (const choix of ["exaucer", "modifier", "refuser", "ignorer"]) {
+      const bouton = document.createElement("button");
+      bouton.textContent = { exaucer: "Exaucer", modifier: "Modifier", refuser: "Refuser", ignorer: "Ignorer" }[choix];
+      bouton.onclick = () => {
+        const r = appeler(`moteur.decider(${p.id}, '${choix}')`);
+        etat = r.etat; rendre();
+      };
+      div.querySelector(".boutons").appendChild(bouton);
+    }
+    zone.appendChild(div);
+  }
+}
+
+function afficherEnergie() {
+  const zone = $("energie");
+  if (!etat.energie.length) { zone.textContent = "Pas encore de peuple."; return; }
+  zone.innerHTML = etat.energie.map((e) =>
+    `<div class="ligne">${e.membres} personnes · besoin ${e.besoin} · production ${e.production} · <b>${e.statut}</b>` +
+    `<div class="petit">Sources : ${e.sources.join(", ") || "aucune"}</div></div>`).join("");
+}
+
+function afficherChronique() {
+  const zone = $("chronique");
+  if (!etat.chronique.length) { zone.textContent = "Rien d'historique encore."; return; }
+  zone.innerHTML = etat.chronique.slice().reverse().map((e) =>
+    `<div class="ligne">Tour ${e.tour} : ${e.texte}</div>`).join("");
+}
+
+function avancer() {
+  etat = appeler(`moteur.avancer(${$("vitesse").value})`);
+  rendre();
+}
+
+function lier() {
+  $("lecture").onclick = () => { enCours = !enCours; rendre(); };
+  $("zoom+").onclick = () => { zoomCarte *= 1.4; rendre(); };
+  $("zoom-").onclick = () => { zoomCarte = Math.max(0.5, zoomCarte / 1.4); rendre(); };
+  $("sauver").onclick = () => { localStorage.setItem(CLE_SAUVEGARDE, py.runPython("moteur.sauver()")); alert("Partie sauvegardée sur ce téléphone."); };
+  $("charger").onclick = () => {
+    const sauve = localStorage.getItem(CLE_SAUVEGARDE);
+    if (!sauve) { alert("Aucune sauvegarde."); return; }
+    py.globals.set("texte_entree", sauve);
+    etat = JSON.parse(py.runPython("import json, moteur\njson.dumps(moteur.charger_texte(texte_entree))"));
+    rendre();
+  };
+  $("nouvelle").onclick = () => {
+    const graine = Math.max(1, parseInt($("graine").value || "1", 10));
+    etat = appeler(`moteur.nouvelle_partie(${graine})`);
+    rendre();
+  };
+  $("fermer-zone").onclick = () => { $("zone-wrap").style.display = "none"; };
+
+  const carte = $("carte");
+  let glisse = null;
+  carte.addEventListener("pointerdown", (e) => { glisse = { x: e.clientX, y: e.clientY, dx: decalage.x, dy: decalage.y, moved: false }; });
+  carte.addEventListener("pointermove", (e) => {
+    if (!glisse) return;
+    const dx = (e.clientX - glisse.x) * devicePixelRatio, dy = (e.clientY - glisse.y) * devicePixelRatio;
+    if (Math.abs(dx) + Math.abs(dy) > 4) glisse.moved = true;
+    decalage = { x: glisse.dx + dx, y: glisse.dy + dy };
+    dessinerCarte();
+  });
+  carte.addEventListener("pointerup", (e) => {
+    if (glisse && !glisse.moved) toucher(e);
+    glisse = null;
+  });
+  carte.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    zoomCarte = Math.min(40, Math.max(0.5, zoomCarte * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+    dessinerCarte();
+  }, { passive: false });
+}
+
+function toucher(e) {
+  const rect = $("carte").getBoundingClientRect();
+  const px = (e.clientX - rect.left) * devicePixelRatio, py_ = (e.clientY - rect.top) * devicePixelRatio;
+  const i = (px - decalage.x) / zoomCarte, j = (py_ - decalage.y) / zoomCarte;
+  let meilleure = null, distance = Infinity;
+  for (const p of etat.personnes) {
+    const d = Math.hypot(p.x - i, p.y - j);
+    if (d < distance) { distance = d; meilleure = p; }
+  }
+  if (!meilleure || distance * zoomCarte > 30) { $("info").style.display = "none"; return; }
+  dernierClic = meilleure;
+  $("info").style.display = "block";
+  $("info").innerHTML =
+    `<h3>Personne n°${meilleure.id}</h3>` +
+    `<div>Soif ${meilleure.soif} · Faim ${meilleure.faim} · Foi ${meilleure.foi}` +
+    `${meilleure.schismatique ? " · schismatique" : ""}</div>` +
+    `<div class="petit">Position : ${meilleure.x}, ${meilleure.y}</div>` +
+    `<button id="voir-zone" class="principal" style="margin-top:6px">Voir la zone à 5 m par case</button>`;
+  $("voir-zone").onclick = voirZone;
+}
+
+function voirZone() {
+  const z = appeler(`moteur.zone(${dernierClic.x}, ${dernierClic.y})`);
+  const canvas = $("zone-canvas");
+  canvas.width = z.cote; canvas.height = z.cote;
+  const ctx = canvas.getContext("2d");
+  const img = ctx.createImageData(z.cote, z.cote);
+  for (let k = 0; k < z.cote * z.cote; k++) {
+    const [r, g, b] = COULEURS_ZONE[z.cases[k]];
+    img.data[k * 4] = r; img.data[k * 4 + 1] = g; img.data[k * 4 + 2] = b; img.data[k * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  for (const v of z.vehicules) {
+    ctx.fillStyle = v.type === "bus" ? "#ffc800" : v.type === "avion" ? "#ef4444" : "#ffffff";
+    ctx.fillRect(v.x - 1, v.y - 1, 2, 2);
+  }
+  $("zone-wrap").style.display = "block";
+  $("zone-wrap").scrollIntoView({ behavior: "smooth" });
+}
+
+demarrer().catch((err) => {
+  $("pret").textContent = "Impossible de démarrer : " + err;
+  console.error(err);
+});

@@ -4,7 +4,7 @@
 
 Mis à jour à chaque tour de travail. Une tâche n'est cochée que si elle est vérifiée (tests ou démonstration). Pour recalculer la barre : `python3 avancement.py`.
 
-## Avancement global : 90 %
+## Avancement global : 87 %
 
 Calcul : moyenne des pourcentages des six phases. Phase 1 à 78 %, phases 2 à 6 non commencées.
 
@@ -99,3 +99,13 @@ Constat initial : sur une année, aucun couple ne se forme, car les rencontres s
 - [ ] Économie : échanges de ressources entre peuples
 - [ ] Effets de la pénurie d'électricité sur les personnes (foi, colère, santé)
 - [ ] Centrales et installations placées sur la carte, et non seulement comptées
+
+## Phase 11 : Application jouable (57 %)
+
+- [x] Moteur dans le navigateur (Pyodide) : carte de la Terre, personnes, buissons, prières, énergie, histoire
+- [x] Vue zoomée d'une zone à 5 m par case au toucher d'une personne
+- [x] Sauvegarde automatique dans le navigateur du téléphone
+- [x] Testée dans Chrome (mobile) : démarrage, avancement, prières, zone zoomée
+- [ ] Hébergement en ligne (GitHub Pages) : nécessite d'activer Pages dans le dépôt
+- [ ] APK Android : le SDK Android n'est pas disponible ici ; à faire après l'hébergement (Trusted Web Activity)
+- [ ] Cache hors connexion : refusé dans les pages publiées ; fonctionne après hébergement
