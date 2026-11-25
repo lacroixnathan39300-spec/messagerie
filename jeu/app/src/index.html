@@ -21,7 +21,17 @@
   .barre { display:block; padding:6px 10px; color:#e2e8f0; }
   .barre > * { margin:0 6px 6px 0; vertical-align:middle; }
   #message { color:#fbbf24; }
-  #carte-wrap { position:relative; width:100%; height:44vh; background:#0b1220; overflow:hidden; touch-action:none; }
+  #dock { position:fixed; left:0; right:0; bottom:0; z-index:5; background:#111827; border-top:1px solid #334155; padding:6px 6px 8px; }
+  #dock .onglets { display:flex; gap:4px; margin-bottom:6px; }
+  #dock .onglets button { flex:1; font-size:13px; }
+  #dock .outils { display:flex; flex-wrap:wrap; gap:6px; }
+  #dock .outils[hidden] { display:none; }
+  #dock .outils button { font-size:20px; min-width:64px; padding:6px 8px; display:flex; flex-direction:column; align-items:center; }
+  #dock .outils button small { font-size:11px; color:#94a3b8; }
+  #dock .outils button.actif { border-color:var(--accent); background:#0c4a6e; }
+  #dock .onglets button.actif { background:var(--accent); color:#0f172a; }
+  body { padding-bottom:150px; }
+  #carte-wrap { position:relative; width:100%; height:62vh; background:#0b1220; overflow:hidden; touch-action:none; }
   canvas { display:block; width:100%; height:100%; }
   .panneau { background:var(--carte); margin:8px 10px; padding:10px; border-radius:10px; font-size:13px; }
   .panneau h3 { margin:0 0 6px; font-size:14px; color:var(--accent); }
@@ -39,6 +49,19 @@
 <body>
 
 <div id="pret">Chargement du monde… (la première fois, environ une minute)</div>
+
+<nav id="dock">
+    <div class="onglets">
+      <button data-categorie="voir" class="actif">👁 Voir</button>
+      <button data-categorie="etres">🧍 Êtres</button>
+      <button data-categorie="nature">🌿 Nature</button>
+      <button data-categorie="pouvoirs">⚡ Pouvoirs</button>
+    </div>
+    <div class="outils" data-categorie="voir"><button data-outil="voir" class="actif"><span>👁</span><small>Voir</small></button></div>
+    <div class="outils" data-categorie="etres" hidden><button data-outil="humain"><span>🧍</span><small>Personne</small></button></div>
+    <div class="outils" data-categorie="nature" hidden><button data-outil="buisson"><span>🌿</span><small>Buisson</small></button></div>
+    <div class="outils" data-categorie="pouvoirs" hidden><button data-outil="foudre"><span>⚡</span><small>Foudre</small></button></div>
+  </nav>
 
 <div id="jeu" style="display:none">
   <div id="haut" style="background:#0f172a;color:#e2e8f0">

@@ -178,6 +178,20 @@ function avancer() {
 }
 
 function lier() {
+  const select = $("outil");
+  for (const bouton of document.querySelectorAll("#dock .onglets button")) {
+    bouton.onclick = () => {
+      document.querySelectorAll("#dock .onglets button").forEach((b) => b.classList.toggle("actif", b === bouton));
+      document.querySelectorAll("#dock .outils").forEach((d) => { d.hidden = d.dataset.categorie !== bouton.dataset.categorie; });
+      document.querySelector(`#dock .outils[data-categorie="${bouton.dataset.categorie}"] button`).click();
+    };
+  }
+  for (const bouton of document.querySelectorAll("#dock .outils button")) {
+    bouton.onclick = () => {
+      select.value = bouton.dataset.outil;
+      document.querySelectorAll("#dock .outils button").forEach((b) => b.classList.toggle("actif", b === bouton));
+    };
+  }
   $("lecture").onclick = () => { enCours = !enCours; rendre(); };
   $("zoom+").onclick = () => { zoomCarte *= 1.4; rendre(); };
   $("zoom-").onclick = () => { zoomCarte = Math.max(0.5, zoomCarte / 1.4); rendre(); };
