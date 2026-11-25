@@ -1,0 +1,44 @@
+name: "Terre vivante : publication web"
+on:
+  push:
+    branches: [jeu-terre-vivante]
+    paths: ["jeu/**", ".github/workflows/terre-vivante-pages.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages-terre-vivante
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Récupération du moteur Pyodide
+        run: |
+          mkdir -p "$RUNNER_TEMP/pyodide" && cd "$RUNNER_TEMP/pyodide"
+          npm pack pyodide@314.0.8
+          tar -xzf pyodide-314.0.8.tgz
+      - name: Assemblage de l'appli
+        working-directory: jeu
+        run: python3 tools/construire_app.py "$RUNNER_TEMP/pyodide/package"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: jeu/app/dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - id: deploiement
+        uses: actions/deploy-pages@v4
