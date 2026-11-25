@@ -82,3 +82,5 @@ def verifier_accidents(sim, rng=None):
             if sim._distance(p.case, centre.case) <= RAYON_ACCIDENT:
                 p.energie = max(0.0, p.energie - PERTE_ENERGIE_ACCIDENT)
                 p.ajouter_souvenir("a subi un accident nucléaire", 1.0)
+                if p.longevite is not None:
+                    p.longevite -= 180

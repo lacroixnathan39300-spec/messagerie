@@ -152,6 +152,27 @@ class TestSauvegardeDesSystemes(unittest.TestCase):
         self.assertEqual(recharge.monde.points_eau, monde.points_eau)
 
 
+class TestLongevite(unittest.TestCase):
+    def test_la_medecine_allonge_la_vie(self):
+        monde = ligne(10)
+        sim = Simulation(monde, [], graine=1)
+        base = sim._longevite_pour(Personne(0, 0, 0))
+        sim.culture.connues.add("medecine")
+        self.assertGreater(sim._longevite_pour(Personne(1, 0, 0)), base)
+
+    def test_la_faim_use_la_vie(self):
+        monde = ligne(10)
+        p = Personne(0, 5, 0, faim=90, longevite=1000.0)
+        sim = Simulation(monde, [p], graine=1)
+        avant = p.longevite
+        sim.tour_suivant()
+        self.assertLess(p.longevite, avant)
+
+    def test_on_meurt_de_vieillesse_a_sa_longevite(self):
+        p = Personne(0, 0, 0, age=500, longevite=500.0)
+        self.assertTrue(p.meurt_de_vieillesse())
+
+
 class TestTerreAvecVie(unittest.TestCase):
     def test_un_groupe_sur_la_terre_reelle_survit_quelques_mois(self):
         monde = charger_terre()

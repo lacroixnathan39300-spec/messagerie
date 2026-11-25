@@ -34,7 +34,7 @@ def _personne_vers_dict(p):
         "rumeurs": [{"sujet": r["sujet"], "valeur": list(r["valeur"]), "fiabilite": r["fiabilite"]}
                     for r in p.rumeurs],
         "foi": p.foi, "colere": p.colere, "schismatique": p.schismatique,
-        "derniere_priere": p.derniere_priere, "savoirs": sorted(p.savoirs), "langue": p.langue, "soif": p.soif,
+        "derniere_priere": p.derniere_priere, "savoirs": sorted(p.savoirs), "langue": p.langue, "soif": p.soif, "longevite": p.longevite,
     }
 
 
@@ -44,7 +44,7 @@ def _personne_depuis_dict(d):
                  enfants=list(d["enfants"]), foi=d["foi"], colere=d["colere"],
                  schismatique=d["schismatique"], derniere_priere=d["derniere_priere"],
                  savoirs=set(d["savoirs"]), langue=d["langue"],
-                 soif=d.get("soif", 0.0))
+                 soif=d.get("soif", 0.0), longevite=d.get("longevite"))
     p.souvenirs = [[texte, poids] for texte, poids in d["souvenirs"]]
     p.rumeurs = [{"sujet": r["sujet"], "valeur": tuple(r["valeur"]), "fiabilite": r["fiabilite"]}
                  for r in d["rumeurs"]]

@@ -1,7 +1,7 @@
 """Boucle de simulation : à chaque tour, les personnes vieillissent, se rencontrent, décident et agissent."""
 import random
 
-from .personne import SEUIL_FAIM, Personne
+from .personne import AGE_MAX, SEUIL_FAIM, SEUIL_SOIF, Personne
 from .culture import PROBA_TRANSMISSION, Culture
 from collections import Counter
 
@@ -12,6 +12,8 @@ from .peuples import en_contact, peuples, relation
 from .priere import (DUREE_PRIERE, EXAUCER, IGNORER, MODIFIER, REFUSER,
                      Priere, besoins_pressants)
 
+USURE_FAIM_SOIF = 0.5  # jours de vie perdus par tour de faim ou de soif
+USURE_ACCIDENT = 180  # jours de vie perdus lors d'un accident nucléaire
 PERTE_SOIF = 0.8  # soif gagnée par tour (si la carte a des points d'eau)
 EAU_BU = 50.0  # soif calmée par une gorgée complète
 PORTEE_EAU = 80  # nombre de pas maximum pour chercher de l'eau
@@ -65,7 +67,13 @@ class Simulation:
     def tour_suivant(self):
         self.tour += 1
         for p in self.vivantes():
+            if p.longevite is None:
+                p.longevite = self._longevite_pour(p)
             p.age += 1
+            if p.faim >= SEUIL_FAIM:
+                p.longevite -= USURE_FAIM_SOIF
+            if self._eau_active() and p.soif >= SEUIL_SOIF:
+                p.longevite -= USURE_FAIM_SOIF
             p.faim += PERTE_FAIM
             if self._eau_active():
                 p.soif += PERTE_SOIF
@@ -90,6 +98,19 @@ class Simulation:
                 self._mourir(p, "vieillesse")
         self._naissances()
         self.monde.repousser()
+
+    def _longevite_pour(self, p):
+        """Durée de vie selon les savoirs de l'humanité : médecine, électricité, époque."""
+        from .culture import EPOQUES
+        facteur = 1.0
+        if "medecine" in self.culture.connues:
+            facteur += 0.10
+        if "electricite" in self.culture.connues:
+            facteur += 0.05
+        epoque = self.culture.epoque()
+        rang = [nom for nom, _ in EPOQUES].index(epoque)
+        facteur += 0.03 * rang
+        return AGE_MAX * min(1.6, max(0.5, facteur))
 
     def bilan(self):
         vivantes = self.vivantes()
@@ -468,6 +489,7 @@ class Simulation:
             if (self._distance(p.case, q.case) <= 2 and p.faim < SEUIL_FAIM and q.faim < SEUIL_FAIM
                     and self.rng.random() < PROBA_NAISSANCE):
                 enfant = Personne(self._prochain_id, p.x, p.y, langue=p.langue)
+                enfant.longevite = self._longevite_pour(enfant)
                 self._prochain_id += 1
                 self.personnes.append(enfant)
                 p.enfants.append(enfant.identifiant)

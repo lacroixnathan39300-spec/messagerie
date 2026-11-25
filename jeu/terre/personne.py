@@ -32,6 +32,7 @@ class Personne:
     schismatique: bool = False  # True une fois entrée dans un groupe qui s'est séparé
     derniere_priere: int = -1000  # tour de la dernière prière formulée
     savoirs: set = field(default_factory=set)  # techniques que cette personne connaît
+    longevite: float = None  # durée de vie en tours, fixée selon les conditions de vie
     langue: str = ""  # identifiant de la langue parlée par son peuple
 
     @property
@@ -57,7 +58,8 @@ class Personne:
         return self.faim >= FAIM_MORTELLE
 
     def meurt_de_vieillesse(self):
-        return self.age >= AGE_MAX
+        duree = AGE_MAX if self.longevite is None else self.longevite
+        return self.age >= duree
 
     def ajouter_souvenir(self, texte, poids=1.0):
         self.souvenirs.append([texte, poids])
