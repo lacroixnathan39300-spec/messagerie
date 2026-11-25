@@ -1,9 +1,0 @@
-{
-  "name": "Terre vivante",
-  "short_name": "Terre vivante",
-  "start_url": "index.html",
-  "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#1d4ed8",
-  "icons": [{ "src": "icone.png", "sizes": "192x192", "type": "image/png" }]
-}
