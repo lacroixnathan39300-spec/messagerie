@@ -70,6 +70,7 @@ def sauvegarder(sim, chemin):
             "prochaine_priere": sim._prochaine_priere,
             "guerres": sim.guerres,
             "langues": sim.langues,
+            "prochaine_langue": sim._prochaine_langue,
             "dictionnaire": {k: sorted(v) for k, v in sim.dictionnaire.items()},
             "prieres": [{"identifiant": pr.identifiant, "auteur": pr.auteur, "besoin": pr.besoin,
                          "intensite": pr.intensite, "tour": pr.tour, "statut": pr.statut}
@@ -117,6 +118,7 @@ def charger(chemin, joueur=None):
     sim._prochaine_priere = s["prochaine_priere"]
     sim.guerres = s["guerres"]
     sim.langues = s["langues"]
+    sim._prochaine_langue = s["prochaine_langue"]
     sim.dictionnaire = {k: set(v) for k, v in s["dictionnaire"].items()}
     sim.prieres = [Priere(pr["identifiant"], pr["auteur"], pr["besoin"], pr["intensite"],
                           pr["tour"], pr["statut"]) for pr in s["prieres"]]

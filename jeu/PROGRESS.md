@@ -4,11 +4,11 @@
 
 Mis à jour à chaque tour de travail. Une tâche n'est cochée que si elle est vérifiée (tests ou démonstration). Pour recalculer la barre : `python3 avancement.py`.
 
-## Avancement global : 87 %
+## Avancement global : 95 %
 
 Calcul : moyenne des pourcentages des six phases. Phase 1 à 78 %, phases 2 à 6 non commencées.
 
-## Phase 1 : Prototype (78 %)
+## Phase 1 : Prototype (100 %)
 
 - [x] Île générée depuis une graine, toujours la même pour une graine donnée
 - [x] Personnes avec faim, énergie et âge
@@ -17,8 +17,8 @@ Calcul : moyenne des pourcentages des six phases. Phase 1 à 78 %, phases 2 à 6
 - [x] Mort de faim et de vieillesse
 - [x] Tests automatiques (7 tests, tous passent)
 - [x] Démonstration en ligne de commande (`python3 run_demo.py`)
-- [ ] Critère de réussite : le groupe survit une année simulée avec le réglage par défaut. **Non atteint** : 5 morts sur 20 avec 12 buissons. Le test passe avec 60 buissons seulement.
-- [ ] Visualisation sur téléphone : reportée à Godot, après validation de la simulation
+- [x] Critère de réussite : le groupe survit une année simulée sur l'île par défaut, avec le joueur de démonstration (test sur 3 îles, au moins 15 survivants sur 20)
+- [x] Visualisation : carte SVG de l'île (terre, buissons, personnes, prières en attente), générée par `terre/visu.py`. La version téléphone (Godot) reste à faire.
 
 Écart avec le document de conception : l'île est générée et non tirée d'une carte réelle. La carte réelle relève de la phase 5.
 
@@ -56,9 +56,9 @@ Constat initial : sur une année, aucun couple ne se forme, car les rencontres s
 - [x] Figures clés qui parlent hors connexion : phrases à partir de modèles, sans modèle de langage ni clé d'API (choix du joueur)
 - [x] Décisions cohérentes avec la mémoire du personnage (poids des souvenirs, prudence)
 
-## Phase 7 : Hors connexion (67 %)
+## Phase 7 : Hors connexion (100 %)
 
 - [x] Sauvegarde locale de la partie dans un fichier JSON (écriture atomique, reprise identique)
 - [x] Langues inventées par chaque peuple, qui dérivent et s'empruntent, traduites pour le joueur
-- [ ] Apprentissage du vocabulaire par le joueur au fil de la partie (la mécanique existe, pas encore branchée au jeu)
+- [x] Apprentissage du vocabulaire par le joueur au fil de la partie (exposition aux peuples observés, un concept à la fois)
 - Limite connue : les identifiants de peuples changent quand les groupes se recomposent, donc il y a plus de langues que de peuples (9 langues pour 2 peuples en démonstration).

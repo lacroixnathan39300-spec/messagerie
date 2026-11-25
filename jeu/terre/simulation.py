@@ -3,7 +3,11 @@ import random
 
 from .personne import SEUIL_FAIM, Personne
 from .culture import PROBA_TRANSMISSION, Culture
-from .langue import PROBA_DERIVE, PROBA_EMPRUNT, creer as creer_langue, deriver, emprunter
+from collections import Counter
+
+from .langue import CONCEPTS, PROBA_DERIVE, PROBA_EMPRUNT, creer as creer_langue, deriver, emprunter
+
+PROBA_APPRENTISSAGE = 0.01  # chance par tour qu'un peuple observé fasse apprendre un concept au joueur
 from .peuples import en_contact, peuples, relation
 from .priere import (DUREE_PRIERE, EXAUCER, IGNORER, MODIFIER, REFUSER,
                      Priere, besoins_pressants)
@@ -49,6 +53,7 @@ class Simulation:
         self.guerres = 0  # nombre de tours où deux peuples en contact étaient en guerre
         self.langues = {}  # identifiant -> langue (voir terre/langue.py)
         self.dictionnaire = {}  # identifiant de langue -> concepts que le joueur a appris
+        self._prochaine_langue = 0
 
     def vivantes(self):
         return [p for p in self.personnes if p.vivante]
@@ -124,14 +129,22 @@ class Simulation:
             emprunter(langue_a, langue_b, self.rng)
 
     def _attribuer_langues(self):
-        """Chaque peuple a une langue ; elle dérive lentement."""
+        """Chaque peuple garde la langue de la majorité de ses membres, même si le groupe change.
+        Les langues dérivent lentement. Le joueur entend parfois un nouveau mot."""
         for peuple in peuples(self._groupes()):
-            identifiant = str(peuple.identifiant)
+            existantes = Counter(p.langue for p in peuple.membres if p.langue)
+            if existantes:
+                identifiant = existantes.most_common(1)[0][0]
+            else:
+                identifiant = f"{self.graine}-{self._prochaine_langue}"
+                self._prochaine_langue += 1
             if identifiant not in self.langues:
                 self.langues[identifiant] = creer_langue(self.graine, identifiant)
             for p in peuple.membres:
-                if not p.langue:
-                    p.langue = identifiant
+                p.langue = identifiant
+            if self.rng.random() < PROBA_APPRENTISSAGE:
+                concept = self.rng.choice(CONCEPTS)
+                self.dictionnaire.setdefault(identifiant, set()).add(concept)
         for langue in self.langues.values():
             if self.rng.random() < PROBA_DERIVE:
                 deriver(langue, self.rng)
