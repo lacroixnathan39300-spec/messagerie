@@ -1,0 +1,53 @@
+name: "Terre vivante : APK"
+on:
+  push:
+    branches: [jeu-terre-vivante]
+    paths: ["jeu/**", ".github/workflows/terre-vivante-apk.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Récupération du moteur Pyodide
+        run: |
+          mkdir -p "$RUNNER_TEMP/pyodide" && cd "$RUNNER_TEMP/pyodide"
+          npm pack pyodide@314.0.8
+          tar -xzf pyodide-314.0.8.tgz
+      - name: Assemblage de l'appli web
+        working-directory: jeu
+        run: python3 tools/construire_app.py "$RUNNER_TEMP/pyodide/package"
+      - name: Intégration dans l'APK
+        run: |
+          mkdir -p jeu/android/app/src/main/assets/jeu
+          cp -r jeu/app/dist/. jeu/android/app/src/main/assets/jeu/
+      - name: Compilation de l'APK
+        working-directory: jeu/android
+        run: gradle :app:assembleRelease --no-daemon -Pvc=${{ github.run_number }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terre-vivante
+          path: jeu/android/app/build/outputs/apk/release/app-release.apk
+      - name: Publication en release GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="terre-${{ github.run_number }}"
+          cp jeu/android/app/build/outputs/apk/release/app-release.apk TerreVivante.apk
+          gh release create "$TAG" TerreVivante.apk --title "Terre vivante ${{ github.run_number }}" --notes "APK hors connexion." --latest
