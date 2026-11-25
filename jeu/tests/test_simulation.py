@@ -144,5 +144,77 @@ class TestFamilles(unittest.TestCase):
         self.assertEqual(a.enfants, [2])
 
 
+class TestPrieres(unittest.TestCase):
+    def _sim_avec_faim(self, foi=1.0, joueur=None):
+        monde = petite_ile()
+        p = Personne(0, 2, 2, faim=95, foi=foi)
+        sim = Simulation(monde, [p], graine=1, joueur=joueur)
+        return sim, p
+
+    def test_priere_formulee_quand_la_faim_est_forte(self):
+        sim, p = self._sim_avec_faim()
+        with mock.patch.object(sim_module, "PROBA_PRIERE", 1.0):
+            sim._prier()
+        self.assertEqual(len(sim.prieres_en_attente()), 1)
+        self.assertEqual(sim.prieres_en_attente()[0].besoin, "faim")
+
+    def test_pas_de_priere_sans_foi(self):
+        sim, p = self._sim_avec_faim(foi=0.0)
+        with mock.patch.object(sim_module, "PROBA_PRIERE", 1.0):
+            sim._prier()
+        self.assertEqual(sim.prieres, [])
+
+    def test_exaucer_satisfait_le_besoin_et_renforce_la_foi(self):
+        sim, p = self._sim_avec_faim(foi=0.5)
+        with mock.patch.object(sim_module, "PROBA_PRIERE", 1.0):
+            sim._prier()
+        pr = sim.prieres[0]
+        foi_avant = p.foi
+        self.assertTrue(sim.decider(pr.identifiant, "exaucer"))
+        self.assertEqual(p.faim, 0.0)
+        self.assertGreater(p.foi, foi_avant)
+
+    def test_refuser_fait_monter_la_colere_et_baisser_la_foi(self):
+        sim, p = self._sim_avec_faim()
+        with mock.patch.object(sim_module, "PROBA_PRIERE", 1.0):
+            sim._prier()
+        pr = sim.prieres[0]
+        sim.decider(pr.identifiant, "refuser")
+        self.assertGreater(p.colere, 0.0)
+        self.assertLess(p.foi, 1.0)
+
+    def test_decision_unique_par_priere(self):
+        sim, p = self._sim_avec_faim()
+        with mock.patch.object(sim_module, "PROBA_PRIERE", 1.0):
+            sim._prier()
+        pr = sim.prieres[0]
+        self.assertTrue(sim.decider(pr.identifiant, "exaucer"))
+        self.assertFalse(sim.decider(pr.identifiant, "refuser"))
+
+    def test_priere_ignoree_apres_expiration(self):
+        sim, p = self._sim_avec_faim()
+        with mock.patch.object(sim_module, "PROBA_PRIERE", 1.0):
+            sim._prier()
+        pr = sim.prieres[0]
+        pr.tour = -sim_module.DUREE_PRIERE
+        sim._traiter_prieres()
+        self.assertEqual(pr.statut, "ignorer")
+
+    def test_joueur_automatique_repond_a_chaque_priere(self):
+        sim, p = self._sim_avec_faim(joueur=lambda pr, s: "modifier")
+        with mock.patch.object(sim_module, "PROBA_PRIERE", 1.0):
+            sim._prier()
+            sim._traiter_prieres()
+        self.assertEqual(sim.prieres[0].statut, "modifier")
+
+    def test_schisme_quand_un_groupe_proche_est_en_colere(self):
+        monde = petite_ile()
+        groupe = [Personne(i, 2, 2, colere=0.9) for i in range(3)]
+        sim = Simulation(monde, groupe, graine=1)
+        sim._verifier_schismes()
+        self.assertEqual(len(sim.schismes), 1)
+        self.assertTrue(all(p.schismatique for p in groupe))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -4,7 +4,7 @@
 
 Mis à jour à chaque tour de travail. Une tâche n'est cochée que si elle est vérifiée (tests ou démonstration). Pour recalculer la barre : `python3 avancement.py`.
 
-## Avancement global : 30 %
+## Avancement global : 46 %
 
 Calcul : moyenne des pourcentages des six phases. Phase 1 à 78 %, phases 2 à 6 non commencées.
 
@@ -30,14 +30,14 @@ Calcul : moyenne des pourcentages des six phases. Phase 1 à 78 %, phases 2 à 6
 - [x] Relations de confiance et d'affection
 - [x] Mariages et familles (mariage entre adultes, naissances entre conjoints)
 
-Constat de la démonstration : sur une année, aucun couple ne se forme, car les rencontres sont trop rares. À régler en phase 2 bis (rapprocher les personnes ou augmenter les rencontres).
+Constat initial : sur une année, aucun couple ne se forme, car les rencontres sont rares. Avec le joueur de démonstration (phase 3), deux couples se forment. La fréquence reste à équilibrer.
 
-## Phase 3 : Prières (0 %)
+## Phase 3 : Prières (100 %)
 
-- [ ] Génération des prières à partir des besoins
-- [ ] File des prières et choix du joueur (exaucer, refuser, modifier, ignorer)
-- [ ] Foi qui évolue selon les réponses
-- [ ] Conséquences des refus (colère, schismes)
+- [x] Génération des prières à partir des besoins (faim, repos, compagnon)
+- [x] File des prières et choix du joueur (exaucer, refuser, modifier, ignorer ; expiration après 20 tours)
+- [x] Foi qui évolue selon les réponses
+- [x] Conséquences des refus (colère, schismes)
 
 ## Phase 4 : Culture (0 %)
 

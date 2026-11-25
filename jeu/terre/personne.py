@@ -24,6 +24,10 @@ class Personne:
     enfants: list = field(default_factory=list)
     souvenirs: list = field(default_factory=list)  # [texte, poids]
     rumeurs: list = field(default_factory=list)  # {"sujet", "valeur", "fiabilite"}
+    foi: float = 0.5  # 0 = incroyant, 1 = très croyant
+    colere: float = 0.0  # monte quand une prière est refusée
+    schismatique: bool = False  # True une fois entrée dans un groupe qui s'est séparé
+    derniere_priere: int = -1000  # tour de la dernière prière formulée
 
     @property
     def case(self):

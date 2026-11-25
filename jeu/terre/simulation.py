@@ -2,7 +2,14 @@
 import random
 
 from .personne import SEUIL_FAIM, Personne
+from .priere import (DUREE_PRIERE, EXAUCER, IGNORER, MODIFIER, REFUSER,
+                     Priere, besoins_pressants)
 
+PROBA_PRIERE = 0.05  # chance par tour de formuler une prière, multipliée par la foi
+COOLDOWN_PRIERE = 40  # tours minimum entre deux prières d'une même personne
+SEUIL_SCHISME = 3  # nombre de personnes en colère, proches, qui se séparent
+COLERE_SCHISME = 0.6
+FOI_MIN_PRIERE = 0.1
 RAYON_VISION = 6
 PERTE_FAIM = 0.5
 PERTE_ENERGIE = 0.3
@@ -18,7 +25,9 @@ DIRECTIONS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 
 class Simulation:
-    def __init__(self, monde, personnes, graine=0):
+    def __init__(self, monde, personnes, graine=0, joueur=None):
+        """`joueur` : fonction (priere, simulation) -> choix, appelée pour chaque prière.
+        Sans fonction, les prières attendent une décision via `decider`."""
         self.monde = monde
         self.personnes = list(personnes)
         self.tour = 0
@@ -26,7 +35,11 @@ class Simulation:
         self.morts = []  # liste de (tour, identifiant, cause)
         self.naissances = 0
         self.relations = {}  # (plus petit id, plus grand id) -> {"confiance", "affection"}
+        self.joueur = joueur
+        self.prieres = []  # toutes les prières formulées
+        self.schismes = []  # liste de (tour, [identifiants])
         self._prochain_id = max((p.identifiant for p in self.personnes), default=-1) + 1
+        self._prochaine_priere = 0
 
     def vivantes(self):
         return [p for p in self.personnes if p.vivante]
@@ -40,6 +53,9 @@ class Simulation:
         for p in self.vivantes():
             self._agir(p)
         self._rencontres()
+        self._prier()
+        self._traiter_prieres()
+        self._verifier_schismes()
         for p in self.vivantes():
             if p.meurt_de_faim():
                 self._mourir(p, "faim")
@@ -51,6 +67,7 @@ class Simulation:
     def bilan(self):
         vivantes = self.vivantes()
         faim_moyenne = sum(p.faim for p in vivantes) / len(vivantes) if vivantes else 0.0
+        foi_moyenne = sum(p.foi for p in vivantes) / len(vivantes) if vivantes else 0.0
         couples = sum(1 for p in vivantes if p.conjoint is not None) // 2
         return {
             "tour": self.tour,
@@ -59,7 +76,101 @@ class Simulation:
             "naissances": self.naissances,
             "couples": couples,
             "faim_moyenne": round(faim_moyenne, 1),
+            "foi_moyenne": round(foi_moyenne, 2),
+            "prieres_en_attente": len(self.prieres_en_attente()),
+            "schismes": len(self.schismes),
         }
+
+    # Prières
+
+    def prieres_en_attente(self):
+        return [pr for pr in self.prieres if pr.en_attente()]
+
+    def decider(self, identifiant_priere, choix):
+        """Le joueur répond à une prière. Renvoie False si elle n'est plus en attente."""
+        if choix not in (EXAUCER, REFUSER, MODIFIER, IGNORER):
+            raise ValueError(f"choix inconnu : {choix}")
+        priere = next((pr for pr in self.prieres if pr.identifiant == identifiant_priere), None)
+        if priere is None or not priere.en_attente():
+            return False
+        self._appliquer(priere, choix)
+        return True
+
+    def _prier(self):
+        vivantes = self.vivantes()
+        for p in vivantes:
+            if p.foi < FOI_MIN_PRIERE or self.tour - p.derniere_priere < COOLDOWN_PRIERE:
+                continue
+            seul = any(q is not p and q.conjoint is None and q.est_adulte() for q in vivantes)
+            besoins = besoins_pressants(p, est_seul_adulte=seul)
+            if not besoins or self.rng.random() >= PROBA_PRIERE * p.foi:
+                continue
+            besoin, intensite = max(besoins, key=lambda bi: bi[1])
+            if any(pr.en_attente() and pr.auteur == p.identifiant and pr.besoin == besoin
+                   for pr in self.prieres):
+                continue
+            priere = Priere(self._prochaine_priere, p.identifiant, besoin, round(intensite, 2), self.tour)
+            self._prochaine_priere += 1
+            self.prieres.append(priere)
+            p.derniere_priere = self.tour
+
+    def _traiter_prieres(self):
+        for priere in self.prieres_en_attente():
+            if self.joueur is not None:
+                self.decider(priere.identifiant, self.joueur(priere, self))
+            elif self.tour - priere.tour >= DUREE_PRIERE:
+                self.decider(priere.identifiant, IGNORER)
+
+    def _appliquer(self, priere, choix):
+        auteur = next((p for p in self.personnes if p.identifiant == priere.auteur), None)
+        priere.statut = choix
+        if auteur is None or not auteur.vivante:
+            return
+        if choix == EXAUCER:
+            self._satisfaire(auteur, priere.besoin, 1.0)
+            auteur.foi = min(1.0, auteur.foi + 0.1)
+            auteur.ajouter_souvenir(f"sa prière a été exaucée ({priere.besoin})", 1.0)
+        elif choix == MODIFIER:
+            self._satisfaire(auteur, priere.besoin, 0.5)
+            auteur.foi = min(1.0, auteur.foi + 0.03)
+            auteur.ajouter_souvenir(f"sa prière a été partiellement exaucée ({priere.besoin})", 0.8)
+        elif choix == REFUSER:
+            auteur.foi = max(0.0, auteur.foi - 0.1)
+            auteur.colere = min(1.0, auteur.colere + 0.3)
+            auteur.ajouter_souvenir(f"sa prière a été refusée ({priere.besoin})", 1.0)
+        elif choix == IGNORER:
+            auteur.foi = max(0.0, auteur.foi - 0.02)
+            auteur.ajouter_souvenir(f"sa prière est restée sans réponse ({priere.besoin})", 0.6)
+
+    def _satisfaire(self, p, besoin, part):
+        if besoin == "faim":
+            p.faim = p.faim * (1.0 - part)
+        elif besoin == "repos":
+            p.energie = min(ENERGIE_MAX, p.energie + (ENERGIE_MAX - p.energie) * part)
+        elif besoin == "compagnon":
+            voisins = [q for q in self.vivantes() if q is not p and q.conjoint is None
+                       and q.est_adulte() and self._distance(p.case, q.case) <= RAYON_VISION]
+            if voisins:
+                q = min(voisins, key=lambda q: (self._distance(p.case, q.case), q.identifiant))
+                cle = (min(p.identifiant, q.identifiant), max(p.identifiant, q.identifiant))
+                relation = self.relations.setdefault(cle, {"confiance": 0.0, "affection": 0.0})
+                relation["affection"] = min(1.0, relation["affection"] + 0.4 * part)
+                relation["confiance"] = min(1.0, relation["confiance"] + 0.4 * part)
+                self._proposer_mariage(p, q, relation)
+
+    def _verifier_schismes(self):
+        """Des personnes en colère et proches se séparent du groupe."""
+        colere = [p for p in self.vivantes() if p.colere >= COLERE_SCHISME and not p.schismatique]
+        for p in colere:
+            groupe = [q for q in colere if self._distance(p.case, q.case) <= RAYON_VISION]
+            if len(groupe) >= SEUIL_SCHISME:
+                for q in groupe:
+                    q.schismatique = True
+                    q.ajouter_souvenir("a rompu avec le groupe", 1.0)
+                self.schismes.append((self.tour, [q.identifiant for q in groupe]))
+                break
+        for p in self.vivantes():
+            p.colere = max(0.0, p.colere - 0.01)
 
     # Actions individuelles
 
