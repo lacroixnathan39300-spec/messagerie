@@ -48,7 +48,7 @@ async function demarrer() {
     // Refusé dans certains hébergements : l'appli marche quand même, seulement sans cache hors connexion.
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
-  setInterval(() => { if (enCours) avancer(); }, 250);
+  setInterval(() => { if (enCours) avancer(); }, 1000);  // 1 seconde = 1 tour (1 jour) à la vitesse ×1
   setInterval(() => { localStorage.setItem(CLE_SAUVEGARDE, py.runPython("moteur.sauver()")); }, 30000);
 }
 

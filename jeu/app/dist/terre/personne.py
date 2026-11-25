@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 FAIM_MORTELLE = 100.0
 SOIF_MORTELLE = 100.0
 SEUIL_SOIF = 50.0
-AGE_MAX = 2000  # en tours
-AGE_ADULTE = 180  # en tours
+AGE_MAX = 70 * 365  # en tours (1 tour = 1 jour) : environ 70 ans
+AGE_ADULTE = 15 * 365  # en tours : 15 ans
 SEUIL_FAIM = 60.0
 SEUIL_FATIGUE = 30.0
 MAX_SOUVENIRS = 30
