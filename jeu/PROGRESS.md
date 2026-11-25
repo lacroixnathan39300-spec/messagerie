@@ -1,8 +1,10 @@
 # Terre vivante : avancement
 
-Mis à jour à chaque tour de travail. Une tâche n'est cochée que si elle est vérifiée (tests ou démonstration).
+![Avancement](avancement.svg)
 
-## Avancement global : 13 %
+Mis à jour à chaque tour de travail. Une tâche n'est cochée que si elle est vérifiée (tests ou démonstration). Pour recalculer la barre : `python3 avancement.py`.
+
+## Avancement global : 30 %
 
 Calcul : moyenne des pourcentages des six phases. Phase 1 à 78 %, phases 2 à 6 non commencées.
 
@@ -20,13 +22,15 @@ Calcul : moyenne des pourcentages des six phases. Phase 1 à 78 %, phases 2 à 6
 
 Écart avec le document de conception : l'île est générée et non tirée d'une carte réelle. La carte réelle relève de la phase 5.
 
-## Phase 2 : Relations (0 %)
+## Phase 2 : Relations (100 %)
 
-- [ ] Communication entre personnes (face à face)
-- [ ] Rumeurs qui se déforment en passant de bouche en bouche
-- [ ] Mémoire des événements avec oubli progressif
-- [ ] Relations de confiance et d'affection
-- [ ] Mariages et familles
+- [x] Communication entre personnes (face à face, rencontres entre voisins)
+- [x] Rumeurs qui se déforment en passant de bouche en bouche (fiabilité qui baisse à chaque passage)
+- [x] Mémoire des événements avec oubli progressif
+- [x] Relations de confiance et d'affection
+- [x] Mariages et familles (mariage entre adultes, naissances entre conjoints)
+
+Constat de la démonstration : sur une année, aucun couple ne se forme, car les rencontres sont trop rares. À régler en phase 2 bis (rapprocher les personnes ou augmenter les rencontres).
 
 ## Phase 3 : Prières (0 %)
 
