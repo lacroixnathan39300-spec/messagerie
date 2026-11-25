@@ -25,6 +25,7 @@ def nouvelle_partie(graine=1):
     personnes = [Personne(i, *rng.choice(cotes)) for i in range(NB_PERSONNES_DEPART)]
     BASE["terre"] = set(monde.cases_terre())
     ETAT["sim"] = Simulation(monde, personnes, graine)
+    _reinitialiser_fleaux()
     ETAT["population"] = charger_population()
     return etat()
 
@@ -39,7 +40,51 @@ def avancer(tours):
     sim = _sim()
     for _ in range(tours):
         sim.tour_suivant()
+        _propager(sim)
     return etat()
+
+
+DUREE_FEU = 6
+PROBA_FEU = 0.3
+PROBA_CONTAGION = 0.15
+PROBA_MORT_PESTE = 0.02
+
+
+def _reinitialiser_fleaux():
+    ETAT["feux"] = {}      # case (x, y) -> jours restants de feu
+    ETAT["peste"] = set()  # identifiants des personnes malades
+
+
+def _propager(sim):
+    """Évolution quotidienne du feu et de la peste."""
+    feux = ETAT.setdefault("feux", {})
+    for c, restant in list(feux.items()):
+        x, y = c
+        for p in sim.vivantes():
+            if p.x == x and p.y == y:
+                sim._mourir(p, "feu")
+        sim.monde.nourriture.pop(c, None)
+        if restant <= 1:
+            del feux[c]
+            continue
+        feux[c] = restant - 1
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            v = (x + dx, y + dy)
+            if v not in feux and sim.monde.est_terre(*v) and random.random() < PROBA_FEU:
+                feux[v] = DUREE_FEU
+
+    malades = ETAT.setdefault("peste", set())
+    vivantes = {p.identifiant: p for p in sim.vivantes()}
+    malades &= set(vivantes)
+    for ident in list(malades):
+        p = vivantes[ident]
+        if random.random() < PROBA_MORT_PESTE:
+            sim._mourir(p, "peste")
+            malades.discard(ident)
+            continue
+        for autre in vivantes.values():
+            if abs(autre.x - p.x) <= 1 and abs(autre.y - p.y) <= 1 and random.random() < PROBA_CONTAGION:
+                malades.add(autre.identifiant)
 
 
 RAYON_FOUDRE = 3
@@ -75,10 +120,13 @@ def agir(outil, i, j, rayon=2):
                    if abs(p.x - i) <= rayon and abs(p.y - j) <= rayon]
         for p in touches:
             sim._mourir(p, "feu")
+        feux = ETAT.setdefault("feux", {})
         for dx in range(-rayon, rayon + 1):
             for dy in range(-rayon, rayon + 1):
-                sim.monde.nourriture.pop((i + dx, j + dy), None)
-        message = f"Le feu ravage la zone : {len(touches)} morts, les buissons brûlent."
+                c = (i + dx, j + dy)
+                if sim.monde.est_terre(*c):
+                    feux[c] = DUREE_FEU
+        message = f"Le feu prend : {len(touches)} morts, il se répand."
     elif outil == "seisme":
         rayon_seisme = rayon * 3
         touches = [p for p in sim.vivantes()
@@ -93,10 +141,10 @@ def agir(outil, i, j, rayon=2):
         # Une personne sur trois dans la zone meurt de la peste (effet immédiat).
         touches = [p for p in sim.vivantes()
                    if abs(p.x - i) <= rayon and abs(p.y - j) <= rayon]
-        malades = touches[::3]
-        for p in malades:
-            sim._mourir(p, "peste")
-        message = f"La peste fait {len(malades)} morts."
+        malades = ETAT.setdefault("peste", set())
+        for p in touches[::3]:
+            malades.add(p.identifiant)
+        message = f"La peste frappe : {len(touches[::3])} malades, elle se transmet."
     elif outil == "montagne":
         posees = 0
         for dx in range(-rayon, rayon + 1):
@@ -200,6 +248,7 @@ def charger_texte(texte):
     with open(CHEMIN_SAUVEGARDE, "w", encoding="utf-8") as f:
         f.write(texte)
     ETAT["sim"] = sauvegarde.charger(CHEMIN_SAUVEGARDE, joueur=None)
+    _reinitialiser_fleaux()
     BASE["terre"] = set(charger().cases_terre())
     actuelle = set(ETAT["sim"].monde.cases_terre())
     for c in actuelle - BASE["terre"]:

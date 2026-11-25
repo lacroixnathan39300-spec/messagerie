@@ -36,9 +36,9 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Buisson (nourriture)
 - ✅ Foudre (tue dans un petit rayon)
 - ✅ Pluie (fait repousser les buissons ; neige et sécheresse à faire)
-- 🟡 Feu (brûle immédiatement une zone ; ne se propage pas encore)
+- ✅ Feu (se propage chaque jour sur la terre et brûle les buissons)
 - 🟡 Tremblement de terre (effet immédiat ; tornade et météorite à faire)
-- 🟡 Peste (effet immédiat sur une personne sur trois ; ne se propage pas encore)
+- ✅ Peste (se transmet entre voisins et tue chaque jour une partie des malades)
 - ❌ Bombes et armes
 
 ## Monde
