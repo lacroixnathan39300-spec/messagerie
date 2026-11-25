@@ -4,7 +4,7 @@
 
 Mis à jour à chaque tour de travail. Une tâche n'est cochée que si elle est vérifiée (tests ou démonstration). Pour recalculer la barre : `python3 avancement.py`.
 
-## Avancement global : 95 %
+## Avancement global : 93 %
 
 Calcul : moyenne des pourcentages des six phases. Phase 1 à 78 %, phases 2 à 6 non commencées.
 
@@ -47,7 +47,7 @@ Constat initial : sur une année, aucun couple ne se forme, car les rencontres s
 
 ## Phase 5 : Monde (67 %)
 
-- [ ] Carte réelle de la Terre (données NASA). Bloqué : il faut télécharger les données, le bac à sable n'y a pas accès.
+- [ ] Carte réelle de la Terre (données NASA). Bloqué : il faut télécharger les données, le bac à sable n'y a pas accès. Une carte PGM fournie par toi (`monde_depuis_pgm`) peut la remplacer.
 - [x] Zoom : planète, région, territoire, personne (vitesse du temps par échelle)
 - [x] Plusieurs peuples qui échangent ou se font la guerre (les peuples en guerre perdent de l'énergie et s'irritent)
 
@@ -61,4 +61,13 @@ Constat initial : sur une année, aucun couple ne se forme, car les rencontres s
 - [x] Sauvegarde locale de la partie dans un fichier JSON (écriture atomique, reprise identique)
 - [x] Langues inventées par chaque peuple, qui dérivent et s'empruntent, traduites pour le joueur
 - [x] Apprentissage du vocabulaire par le joueur au fil de la partie (exposition aux peuples observés, un concept à la fois)
+
+## Phase 8 : Mondes générés (80 %)
+
+- [x] Monde procédural sans bord, généré à la demande par morceaux de 64 cases, à partir d'une graine
+- [x] Formes au choix : continents ou île, et monde borné si on veut une taille fixe
+- [x] Carte fournie par l'utilisateur (image PGM texte) pour une forme réelle, comme la Terre
+- [x] Sauvegarde d'un monde infini (la graine suffit, seuls les buissons modifiés sont stockés)
+- [ ] Échelle 1:1 avec la Terre : impossible en mémoire case par case (800 millions de cases à 1 km). À prévoir avec une échelle plus grossière (par exemple 1 case = 10 km) et une carte fournie.
+
 - Limite connue : les identifiants de peuples changent quand les groupes se recomposent, donc il y a plus de langues que de peuples (9 langues pour 2 peuples en démonstration).

@@ -9,6 +9,7 @@ import os
 
 from .culture import Culture
 from .monde import Monde
+from .monde_infini import MondeInfini
 from .personne import Personne
 from .priere import Priere
 from .simulation import Simulation
@@ -53,11 +54,7 @@ def sauvegarder(sim, chemin):
     """Écrit l'état complet de la simulation dans `chemin`."""
     donnees = {
         "version": VERSION,
-        "monde": {
-            "largeur": sim.monde.largeur, "hauteur": sim.monde.hauteur,
-            "terre": [list(c) for c in sim.monde.cases_terre()],
-            "nourriture": {_vers_cle(c): q for c, q in sim.monde.nourriture.items()},
-        },
+        "monde": _monde_vers_dict(sim.monde),
         "personnes": [_personne_vers_dict(p) for p in sim.personnes],
         "simulation": {
             "tour": sim.tour,
@@ -100,9 +97,7 @@ def charger(chemin, joueur=None):
     if d.get("version") != VERSION:
         raise ValueError(f"version de sauvegarde non prise en charge : {d.get('version')}")
 
-    m = d["monde"]
-    monde = Monde(m["largeur"], m["hauteur"], [tuple(c) for c in m["terre"]])
-    monde.nourriture = {_cle(c): q for c, q in m["nourriture"].items()}
+    monde = _monde_depuis_dict(d["monde"])
 
     personnes = [_personne_depuis_dict(p) for p in d["personnes"]]
     sim = Simulation(monde, personnes, graine=0, joueur=joueur)
@@ -131,6 +126,30 @@ def charger(chemin, joueur=None):
     culture._epoque = c["epoque"]
     sim.culture = culture
     return sim
+
+
+def _monde_vers_dict(monde):
+    nourriture = {_vers_cle(c): q for c, q in monde.nourriture.items()}
+    if isinstance(monde, MondeInfini):
+        # Un monde infini se régénère à partir de sa graine : seuls les buissons modifiés sont stockés.
+        return {"type": "infini", "graine": monde.graine, "forme": monde.forme,
+                "seuil": monde.seuil, "limite": list(monde.limite) if monde.limite else None,
+                "nourriture": nourriture,
+                "morceaux": [list(c) for c in sorted(monde._chunks_charges)]}
+    return {"type": "fini", "largeur": monde.largeur, "hauteur": monde.hauteur,
+            "terre": [list(c) for c in monde.cases_terre()], "nourriture": nourriture}
+
+
+def _monde_depuis_dict(m):
+    if m.get("type") == "infini":
+        monde = MondeInfini(m["graine"], m["forme"], m["seuil"],
+                            tuple(m["limite"]) if m["limite"] else None)
+        monde.nourriture = {_cle(c): q for c, q in m["nourriture"].items()}
+        monde._chunks_charges = {tuple(c) for c in m["morceaux"]}
+        return monde
+    monde = Monde(m["largeur"], m["hauteur"], [tuple(c) for c in m["terre"]])
+    monde.nourriture = {_cle(c): q for c, q in m["nourriture"].items()}
+    return monde
 
 
 def _etat_rng_vers_json(etat):
