@@ -59,6 +59,26 @@ def agir(outil, i, j, rayon=2):
     elif outil == "buisson":
         sim.monde.nourriture[(i, j)] = NOURRITURE_MAX
         message = "Un buisson pousse."
+    elif outil == "pluie":
+        arrosees = 0
+        for dx in range(-rayon, rayon + 1):
+            for dy in range(-rayon, rayon + 1):
+                if dx * dx + dy * dy > rayon * rayon:
+                    continue
+                c = (i + dx, j + dy)
+                if sim.monde.est_terre(*c):
+                    sim.monde.nourriture[c] = min(NOURRITURE_MAX, sim.monde.nourriture.get(c, 0) + 1)
+                    arrosees += 1
+        message = f"Il pleut sur {arrosees} cases : les buissons repoussent."
+    elif outil == "feu":
+        touches = [p for p in sim.vivantes()
+                   if abs(p.x - i) <= rayon and abs(p.y - j) <= rayon]
+        for p in touches:
+            sim._mourir(p, "feu")
+        for dx in range(-rayon, rayon + 1):
+            for dy in range(-rayon, rayon + 1):
+                sim.monde.nourriture.pop((i + dx, j + dy), None)
+        message = f"Le feu ravage la zone : {len(touches)} morts, les buissons brûlent."
     elif outil == "montagne":
         posees = 0
         for dx in range(-rayon, rayon + 1):

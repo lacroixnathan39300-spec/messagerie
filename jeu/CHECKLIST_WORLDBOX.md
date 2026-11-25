@@ -35,8 +35,8 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Personne (ajout)
 - ✅ Buisson (nourriture)
 - ✅ Foudre (tue dans un petit rayon)
-- ❌ Pluie, neige, sécheresse
-- ❌ Feu (qui se propage sur les forêts)
+- ✅ Pluie (fait repousser les buissons ; neige et sécheresse à faire)
+- 🟡 Feu (brûle immédiatement une zone ; ne se propage pas encore)
 - ❌ Tremblement de terre, tornade, météorite
 - ❌ Peste (qui se propage entre les personnes)
 - ❌ Bombes et armes
