@@ -7,7 +7,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Pause / lecture, vitesse ×1 / ×5 / ×20
 - ✅ Zoom (boutons et molette)
 - 🟡 Pincer pour zoomer sur téléphone (le glissement marche, pas le pincement)
-- ❌ Taille du pinceau réglable (petit / moyen / grand)
+- ✅ Taille du pinceau réglable (petit / moyen / grand)
 - ❌ Panneau d'infos sur une personne : nom, âge, métier, peuple (aujourd'hui : soif, faim, foi)
 - ❌ Sauvegardes multiples et nommées
 - ❌ Menu de réglages (langue, sons, affichage)

@@ -47,7 +47,7 @@ RAYON_PINCEAU = 2
 BASE = {"terre": None}  # terres d'origine de la carte, pour retrouver les changements après un chargement
 
 
-def agir(outil, i, j):
+def agir(outil, i, j, rayon=2):
     """Pouvoir du joueur sur la case (i, j) : humain, buisson, foudre."""
     sim = _sim()
     if outil in ("humain", "buisson") and not sim.monde.est_terre(i, j):
@@ -62,9 +62,9 @@ def agir(outil, i, j):
     elif outil in ("terre", "mer"):
         voulu = outil == "terre"
         noyes = 0
-        for dx in range(-RAYON_PINCEAU, RAYON_PINCEAU + 1):
-            for dy in range(-RAYON_PINCEAU, RAYON_PINCEAU + 1):
-                if dx * dx + dy * dy > RAYON_PINCEAU * RAYON_PINCEAU:
+        for dx in range(-rayon, rayon + 1):
+            for dy in range(-rayon, rayon + 1):
+                if dx * dx + dy * dy > rayon * rayon:
                     continue
                 x, y = i + dx, j + dy
                 if sim.monde.est_terre(x, y) == voulu or not (0 <= x < sim.monde.largeur and 0 <= y < sim.monde.hauteur):

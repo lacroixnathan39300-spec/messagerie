@@ -170,7 +170,7 @@ function message(texte) {
 }
 
 function agir(i, j) {
-  const r = appeler(`moteur.agir('${$("outil").value}', ${i}, ${j})`);
+  const r = appeler(`moteur.agir('${$("outil").value}', ${i}, ${j}, ${$("taille").value})`);
   etat = r.etat;
   message(r.message);
   rendre();
