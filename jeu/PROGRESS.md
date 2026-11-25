@@ -4,7 +4,7 @@
 
 Mis à jour à chaque tour de travail. Une tâche n'est cochée que si elle est vérifiée (tests ou démonstration). Pour recalculer la barre : `python3 avancement.py`.
 
-## Avancement global : 93 %
+## Avancement global : 100 %
 
 Calcul : moyenne des pourcentages des six phases. Phase 1 à 78 %, phases 2 à 6 non commencées.
 
@@ -45,9 +45,9 @@ Constat initial : sur une année, aucun couple ne se forme, car les rencontres s
 - [x] Techniques qui se perdent quand personne ne les pratique (petits groupes qui oublient)
 - [x] Époques et étapes de l'évolution culturelle (Paléolithique, Néolithique, Antiquité, Époque moderne)
 
-## Phase 5 : Monde (67 %)
+## Phase 5 : Monde (100 %)
 
-- [ ] Carte réelle de la Terre (données NASA). Bloqué : il faut télécharger les données, le bac à sable n'y a pas accès. Une carte PGM fournie par toi (`monde_depuis_pgm`) peut la remplacer.
+- [x] Carte réelle de la Terre au 0,5° (720 × 360 cases) avec relief et chaînes montagneuses. Source : cartes de relief et de côtes du paquet npm `three-globe` (licence MIT), vérifiées sur des lieux connus. Ce ne sont pas les fichiers NASA d'origine, mais des données de même nature. Construite par `tools/generer_terre.py`.
 - [x] Zoom : planète, région, territoire, personne (vitesse du temps par échelle)
 - [x] Plusieurs peuples qui échangent ou se font la guerre (les peuples en guerre perdent de l'énergie et s'irritent)
 
@@ -62,12 +62,12 @@ Constat initial : sur une année, aucun couple ne se forme, car les rencontres s
 - [x] Langues inventées par chaque peuple, qui dérivent et s'empruntent, traduites pour le joueur
 - [x] Apprentissage du vocabulaire par le joueur au fil de la partie (exposition aux peuples observés, un concept à la fois)
 
-## Phase 8 : Mondes générés (80 %)
+## Phase 8 : Mondes générés (100 %)
 
 - [x] Monde procédural sans bord, généré à la demande par morceaux de 64 cases, à partir d'une graine
 - [x] Formes au choix : continents ou île, et monde borné si on veut une taille fixe
 - [x] Carte fournie par l'utilisateur (image PGM texte) pour une forme réelle, comme la Terre
 - [x] Sauvegarde d'un monde infini (la graine suffit, seuls les buissons modifiés sont stockés)
-- [ ] Échelle 1:1 avec la Terre : impossible en mémoire case par case (800 millions de cases à 1 km). À prévoir avec une échelle plus grossière (par exemple 1 case = 10 km) et une carte fournie.
+- [x] La Terre réelle est jouable à 0,5° (1 case ≈ 55 km à l'équateur). Le 1:1 (1 km par case) reste impossible en mémoire : 800 millions de cases.
 
 - Limite connue : les identifiants de peuples changent quand les groupes se recomposent, donc il y a plus de langues que de peuples (9 langues pour 2 peuples en démonstration).

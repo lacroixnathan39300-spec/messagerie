@@ -318,7 +318,14 @@ class Simulation:
 
     def _errer(self, p):
         voisins = sorted(self.monde.voisins_terre(p.x, p.y))
-        if voisins:
+        if not voisins:
+            return
+        altitude = getattr(self.monde, "altitude", None)
+        if altitude:
+            # Sur une carte avec relief, les montagnes attirent moins : on y marche moins souvent.
+            poids = [1.0 / (1 + altitude.get(v, 0)) for v in voisins]
+            p.x, p.y = self.rng.choices(voisins, weights=poids)[0]
+        else:
             p.x, p.y = self.rng.choice(voisins)
 
     # Relations entre personnes

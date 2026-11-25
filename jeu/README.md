@@ -37,6 +37,13 @@ Le script recalcule les pourcentages par phase et le pourcentage global, puis r�
 - `terre/figures.py` : personnages clés qui décident et parlent à partir de leur mémoire
 - `terre/langue.py` : langues inventées par les peuples, avec dérive et emprunts
 - `terre/sauvegarde.py` : sauvegarde et reprise de la partie dans un fichier JSON
+- `terre/monde_infini.py` : monde généré à partir d'une graine, ou carte PGM fournie
+- `terre/terre_reelle.py` : la Terre à 0,5° avec relief, chargée depuis `terre/donnees/terre_0_5deg.txt`
+- `tools/generer_terre.py` : reconstruit la grille de la Terre (à lancer une fois, avec Pillow)
+
+## Données de la Terre
+
+La grille vient de cartes de relief et de côtes du paquet npm `three-globe` (licence MIT), vérifiées sur des lieux connus. Ce ne sont pas les fichiers NASA d'origine. Pour les remplacer, relancer `tools/generer_terre.py` avec d'autres images équirectangulaires.
 
 ## Sauvegarder la partie
 
