@@ -144,6 +144,17 @@ class TestFamilles(unittest.TestCase):
         self.assertEqual(a.enfants, [2])
 
 
+class TestFoyer(unittest.TestCase):
+    def test_un_couple_se_rejoint(self):
+        monde = grande_ligne(20)
+        a = Personne(0, 0, 0, age=AGE_ADULTE, conjoint=1)
+        b = Personne(1, 15, 0, age=AGE_ADULTE, conjoint=0)
+        sim = Simulation(monde, [a, b], graine=1)
+        distance_avant = sim._distance(a.case, b.case)
+        sim._agir(a)
+        self.assertLess(sim._distance(a.case, b.case), distance_avant)
+
+
 class TestPrieres(unittest.TestCase):
     def _sim_avec_faim(self, foi=1.0, joueur=None):
         monde = petite_ile()

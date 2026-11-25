@@ -31,6 +31,9 @@ Le script recalcule les pourcentages par phase et le pourcentage global, puis r�
 - `terre/personne.py` : une personne (faim, énergie, âge, souvenirs, rumeurs, foi, colère)
 - `terre/simulation.py` : la boucle à chaque tour (actions, rencontres, rumeurs, mariages, naissances, prières, schismes)
 - `terre/priere.py` : les prières, leurs textes et les besoins qui les déclenchent
+- `terre/culture.py` : techniques, pertes de savoirs et époques
+- `terre/peuples.py` : groupes assez nombreux, échange ou guerre entre eux
+- `terre/echelles.py` : zoom (planète, région, territoire, personne) et vitesse du temps
 - `run_demo.py` : démonstration d'une année simulée avec un joueur simulé
 - `avancement.py` : calcule la barre d'avancement à partir de `PROGRESS.md`
 - `tests/` : tests automatiques

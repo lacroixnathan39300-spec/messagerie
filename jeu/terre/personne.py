@@ -28,6 +28,7 @@ class Personne:
     colere: float = 0.0  # monte quand une prière est refusée
     schismatique: bool = False  # True une fois entrée dans un groupe qui s'est séparé
     derniere_priere: int = -1000  # tour de la dernière prière formulée
+    savoirs: set = field(default_factory=set)  # techniques que cette personne connaît
 
     @property
     def case(self):

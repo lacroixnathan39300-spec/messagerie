@@ -2,9 +2,12 @@
 import random
 
 from .personne import SEUIL_FAIM, Personne
+from .culture import PROBA_TRANSMISSION, Culture
+from .peuples import en_contact, peuples, relation
 from .priere import (DUREE_PRIERE, EXAUCER, IGNORER, MODIFIER, REFUSER,
                      Priere, besoins_pressants)
 
+PERTE_GUERRE = 0.8  # énergie perdue par tour pendant une guerre entre peuples
 PROBA_PRIERE = 0.05  # chance par tour de formuler une prière, multipliée par la foi
 COOLDOWN_PRIERE = 40  # tours minimum entre deux prières d'une même personne
 SEUIL_SCHISME = 3  # nombre de personnes en colère, proches, qui se séparent
@@ -40,6 +43,8 @@ class Simulation:
         self.schismes = []  # liste de (tour, [identifiants])
         self._prochain_id = max((p.identifiant for p in self.personnes), default=-1) + 1
         self._prochaine_priere = 0
+        self.culture = Culture()
+        self.guerres = 0  # nombre de tours où deux peuples en contact étaient en guerre
 
     def vivantes(self):
         return [p for p in self.personnes if p.vivante]
@@ -56,6 +61,8 @@ class Simulation:
         self._prier()
         self._traiter_prieres()
         self._verifier_schismes()
+        self._conflits()
+        self.culture.mettre_a_jour(self.tour, self.personnes, self._groupes(), self.rng)
         for p in self.vivantes():
             if p.meurt_de_faim():
                 self._mourir(p, "faim")
@@ -79,7 +86,25 @@ class Simulation:
             "foi_moyenne": round(foi_moyenne, 2),
             "prieres_en_attente": len(self.prieres_en_attente()),
             "schismes": len(self.schismes),
+            "epoque": self.culture.epoque(),
+            "techniques": sorted(self.culture.connues),
+            "peuples": len(peuples(self._groupes())),
+            "guerres": self.guerres,
         }
+
+    # Peuples
+
+    def _conflits(self):
+        """Deux peuples en contact en guerre s'épuisent et s'irritent mutuellement."""
+        liste = peuples(self._groupes())
+        for i, a in enumerate(liste):
+            for b in liste[i + 1:]:
+                # Deux peuples distincts sont séparés de plus de RAYON_VISION : le contact porte plus loin.
+                if en_contact(a, b, self._distance, 2 * RAYON_VISION) and relation(a, b) == "guerre":
+                    self.guerres += 1
+                    for p in a.membres + b.membres:
+                        p.energie = max(0.0, p.energie - PERTE_GUERRE)
+                        p.colere = min(1.0, p.colere + 0.005)
 
     # Prières
 
@@ -180,8 +205,15 @@ class Simulation:
         elif p.est_fatigue():
             p.energie = min(ENERGIE_MAX, p.energie + REPOS)
         else:
-            self._errer(p)
+            conjoint = self._personne(p.conjoint) if p.conjoint is not None else None
+            if conjoint is not None and conjoint.vivante and self._distance(p.case, conjoint.case) > 2:
+                self._pas_vers(p, conjoint.case)  # un couple rejoint son foyer
+            else:
+                self._errer(p)
             p.energie = max(0.0, p.energie - PERTE_ENERGIE)
+
+    def _personne(self, identifiant):
+        return next((q for q in self.personnes if q.identifiant == identifiant), None)
 
     def _chercher_nourriture(self, p):
         cible = self._buisson_proche(p)
@@ -267,7 +299,33 @@ class Simulation:
         relation["confiance"] = min(1.0, relation["confiance"] + 0.005)
         self._transmettre(a, b)
         self._transmettre(b, a)
+        self._transmettre_savoirs(a, b)
+        self._transmettre_savoirs(b, a)
         self._proposer_mariage(a, b, relation)
+
+    def _transmettre_savoirs(self, source, cible):
+        for nom in sorted(source.savoirs - cible.savoirs):
+            if self.rng.random() < PROBA_TRANSMISSION:
+                cible.savoirs.add(nom)
+                cible.ajouter_souvenir(f"a appris {nom}", 1.0)
+
+    def _groupes(self):
+        """Ensembles de personnes vivantes reliées par une proximité (chaîne de voisins)."""
+        restantes = {p.identifiant: p for p in self.vivantes()}
+        groupes = []
+        while restantes:
+            _, depart = restantes.popitem()
+            groupe, a_voir = [depart], [depart]
+            while a_voir:
+                courant = a_voir.pop()
+                proches = [q for q in restantes.values()
+                           if self._distance(courant.case, q.case) <= RAYON_VISION]
+                for q in proches:
+                    del restantes[q.identifiant]
+                    groupe.append(q)
+                    a_voir.append(q)
+            groupes.append(groupe)
+        return groupes
 
     def _transmettre(self, source, cible):
         for rumeur in list(source.rumeurs):
@@ -302,7 +360,8 @@ class Simulation:
                 continue
             q = index[p.conjoint]
             deja_vus.update({p.identifiant, q.identifiant})
-            if (p.case == q.case and p.faim < SEUIL_FAIM and q.faim < SEUIL_FAIM
+            # Un couple vit ensemble dès qu'il est à deux cases au plus.
+            if (self._distance(p.case, q.case) <= 2 and p.faim < SEUIL_FAIM and q.faim < SEUIL_FAIM
                     and self.rng.random() < PROBA_NAISSANCE):
                 enfant = Personne(self._prochain_id, p.x, p.y)
                 self._prochain_id += 1

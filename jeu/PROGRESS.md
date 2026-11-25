@@ -4,7 +4,7 @@
 
 Mis à jour à chaque tour de travail. Une tâche n'est cochée que si elle est vérifiée (tests ou démonstration). Pour recalculer la barre : `python3 avancement.py`.
 
-## Avancement global : 46 %
+## Avancement global : 74 %
 
 Calcul : moyenne des pourcentages des six phases. Phase 1 à 78 %, phases 2 à 6 non commencées.
 
@@ -39,17 +39,17 @@ Constat initial : sur une année, aucun couple ne se forme, car les rencontres s
 - [x] Foi qui évolue selon les réponses
 - [x] Conséquences des refus (colère, schismes)
 
-## Phase 4 : Culture (0 %)
+## Phase 4 : Culture (100 %)
 
-- [ ] Techniques qui apparaissent selon la taille du groupe
-- [ ] Techniques qui se perdent quand personne ne les pratique
-- [ ] Époques et étapes de l'évolution culturelle
+- [x] Techniques qui apparaissent selon la taille du groupe (outil, feu, arc, poterie, agriculture, écriture, imprimerie)
+- [x] Techniques qui se perdent quand personne ne les pratique (petits groupes qui oublient)
+- [x] Époques et étapes de l'évolution culturelle (Paléolithique, Néolithique, Antiquité, Époque moderne)
 
-## Phase 5 : Monde (0 %)
+## Phase 5 : Monde (67 %)
 
-- [ ] Carte réelle de la Terre (données NASA)
-- [ ] Zoom : planète, région, territoire, personne
-- [ ] Plusieurs peuples qui échangent ou se font la guerre
+- [ ] Carte réelle de la Terre (données NASA). Bloqué : il faut télécharger les données, le bac à sable n'y a pas accès.
+- [x] Zoom : planète, région, territoire, personne (vitesse du temps par échelle)
+- [x] Plusieurs peuples qui échangent ou se font la guerre (les peuples en guerre perdent de l'énergie et s'irritent)
 
 ## Phase 6 : Figures (0 %)
 
