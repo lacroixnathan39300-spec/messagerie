@@ -13,19 +13,10 @@ android {
         versionCode = (project.findProperty("vc")?.toString()?.toIntOrNull()) ?: 1
         versionName = "1.0"
     }
-    // Clé stable : les nouvelles versions s'installent par-dessus sans effacer la partie sauvegardée.
-    signingConfigs {
-        create("stable") {
-            storeFile = file("../cle.jks")
-            storePassword = "terrevivante2026"
-            keyAlias = "terre"
-            keyPassword = "terrevivante2026"
-        }
-    }
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("stable")
+            signingConfig = signingConfigs.getByName("debug")  // signature de test, générée par le runner
         }
     }
     compileOptions {
