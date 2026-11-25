@@ -16,8 +16,9 @@ MONTAGNE = 6  # classe à partir de laquelle la case est considérée comme mont
 PROBA_BUISSON_TERRE = 0.01
 
 
-def charger(chemin=CHEMIN):
-    """Renvoie un Monde (720 × 360 cases) avec l'altitude de chaque case de terre."""
+def charger(chemin=CHEMIN, buissons=True):
+    """Renvoie un Monde (720 × 360 cases) avec l'altitude et l'eau de chaque case de terre.
+    Par défaut, des buissons de nourriture sont semés pour que la carte soit jouable."""
     with open(chemin, encoding="ascii") as f:
         lignes = [l.rstrip("\n") for l in f if l.strip()]
     hauteur = len(lignes)
@@ -30,7 +31,37 @@ def charger(chemin=CHEMIN):
                 altitude[(i, j)] = int(c)
     monde = Monde(largeur, hauteur, terre)
     monde.altitude = altitude
+    monde.grille = "0.5deg"
+    monde.population = _lire_population(CHEMIN_POPULATION)
+    monde.points_eau = _points_eau(monde)
+    if buissons:
+        semer_buissons(monde, 0)
     return monde
+
+
+CHEMIN_POPULATION = os.path.join(os.path.dirname(os.path.abspath(__file__)), "donnees", "population_0_5deg.txt")
+
+
+def _lire_population(chemin):
+    """Dictionnaire {case: classe de population (1 à 9)} ; vide si le fichier manque."""
+    if not os.path.exists(chemin):
+        return {}
+    population = {}
+    with open(chemin, encoding="ascii") as f:
+        for j, ligne in enumerate(l.rstrip("\n") for l in f):
+            for i, c in enumerate(ligne):
+                if c != ".":
+                    population[(i, j)] = int(c)
+    return population
+
+
+def _points_eau(monde):
+    """Eau douce estimée : les côtes, et les cases où vit une population d'au moins la classe 3.
+    Les rivières ne sont pas encore modélisées."""
+    eau = {c for c in monde.cases_terre()
+           if any(not monde.est_terre(c[0] + dx, c[1] + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))}
+    eau |= {c for c, classe in monde.population.items() if classe >= 3 and monde.est_terre(*c)}
+    return eau
 
 
 def semer_buissons(monde, graine=0):

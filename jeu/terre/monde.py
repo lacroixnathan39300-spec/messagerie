@@ -10,6 +10,8 @@ class Monde:
         self.hauteur = hauteur
         self._terre = set(terre)
         self.nourriture = {}  # (x, y) -> quantité entre 0 et NOURRITURE_MAX
+        # Points d'eau douce. None = la soif n'est pas simulée sur cette carte.
+        self.points_eau = None
 
     def est_terre(self, x, y):
         return (x, y) in self._terre

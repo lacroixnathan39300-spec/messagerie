@@ -2,6 +2,8 @@
 from dataclasses import dataclass, field
 
 FAIM_MORTELLE = 100.0
+SOIF_MORTELLE = 100.0
+SEUIL_SOIF = 50.0
 AGE_MAX = 2000  # en tours
 AGE_ADULTE = 180  # en tours
 SEUIL_FAIM = 60.0
@@ -17,6 +19,7 @@ class Personne:
     x: int
     y: int
     faim: float = 20.0
+    soif: float = 0.0
     energie: float = 80.0
     age: int = 0
     vivante: bool = True
@@ -37,6 +40,12 @@ class Personne:
 
     def a_faim(self):
         return self.faim >= SEUIL_FAIM
+
+    def a_soif(self):
+        return self.soif >= SEUIL_SOIF
+
+    def meurt_de_soif(self):
+        return self.soif >= SOIF_MORTELLE
 
     def est_fatigue(self):
         return self.energie < SEUIL_FATIGUE

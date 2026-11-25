@@ -4,7 +4,7 @@
 
 Mis à jour à chaque tour de travail. Une tâche n'est cochée que si elle est vérifiée (tests ou démonstration). Pour recalculer la barre : `python3 avancement.py`.
 
-## Avancement global : 95 %
+## Avancement global : 90 %
 
 Calcul : moyenne des pourcentages des six phases. Phase 1 à 78 %, phases 2 à 6 non commencées.
 
@@ -85,3 +85,17 @@ Constat initial : sur une année, aucun couple ne se forme, car les rencontres s
 - [ ] Lignes de bus réelles et véhicules qui suivent un itinéraire
 - [ ] Avions animés en temps réel sur la carte du jeu (aujourd'hui une image à un instant donné)
 - [ ] Économie : ressources produites et consommées par les peuples
+
+## Phase 10 : Vie quotidienne et savoirs (45 %)
+
+- [x] Soif : eau douce estimée (côtes et zones peuplées), personnes qui cherchent à boire, mort de soif (si la carte a des points d'eau)
+- [x] Énergie et électricité : sources possibles selon les techniques connues (bois, hydro, éolien, solaire, charbon, nucléaire), besoin par époque, statut suffisant ou pénurie
+- [x] Nucléaire : production possible avec la physique nucléaire et une population dense ; les accidents sont consignés et blessent les voisins
+- [x] Sciences apprises comme les techniques : mathématiques, médecine, histoire, astronomie, physique, électricité, physique nucléaire, informatique
+- [x] Histoire : chronique des découvertes, époques, schismes, accidents et morts (`terre/histoire.py`)
+- [ ] Nourriture réaliste : cultures selon le climat, stocks, faim qui dépend de l'agriculture
+- [ ] Rivières réelles pour l'eau douce (aujourd'hui côtes et zones peuplées)
+- [ ] Santé : médecine qui agit sur la mortalité et l'espérance de vie
+- [ ] Économie : échanges de ressources entre peuples
+- [ ] Effets de la pénurie d'électricité sur les personnes (foi, colère, santé)
+- [ ] Centrales et installations placées sur la carte, et non seulement comptées

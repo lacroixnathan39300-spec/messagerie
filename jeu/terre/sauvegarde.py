@@ -34,7 +34,7 @@ def _personne_vers_dict(p):
         "rumeurs": [{"sujet": r["sujet"], "valeur": list(r["valeur"]), "fiabilite": r["fiabilite"]}
                     for r in p.rumeurs],
         "foi": p.foi, "colere": p.colere, "schismatique": p.schismatique,
-        "derniere_priere": p.derniere_priere, "savoirs": sorted(p.savoirs), "langue": p.langue,
+        "derniere_priere": p.derniere_priere, "savoirs": sorted(p.savoirs), "langue": p.langue, "soif": p.soif,
     }
 
 
@@ -43,7 +43,8 @@ def _personne_depuis_dict(d):
                  age=d["age"], vivante=d["vivante"], conjoint=d["conjoint"],
                  enfants=list(d["enfants"]), foi=d["foi"], colere=d["colere"],
                  schismatique=d["schismatique"], derniere_priere=d["derniere_priere"],
-                 savoirs=set(d["savoirs"]), langue=d["langue"])
+                 savoirs=set(d["savoirs"]), langue=d["langue"],
+                 soif=d.get("soif", 0.0))
     p.souvenirs = [[texte, poids] for texte, poids in d["souvenirs"]]
     p.rumeurs = [{"sujet": r["sujet"], "valeur": tuple(r["valeur"]), "fiabilite": r["fiabilite"]}
                  for r in d["rumeurs"]]
@@ -66,6 +67,7 @@ def sauvegarder(sim, chemin):
             "prochain_id": sim._prochain_id,
             "prochaine_priere": sim._prochaine_priere,
             "guerres": sim.guerres,
+            "accidents": [list(a) for a in sim.accidents],
             "langues": sim.langues,
             "prochaine_langue": sim._prochaine_langue,
             "dictionnaire": {k: sorted(v) for k, v in sim.dictionnaire.items()},
@@ -112,6 +114,7 @@ def charger(chemin, joueur=None):
     sim._prochain_id = s["prochain_id"]
     sim._prochaine_priere = s["prochaine_priere"]
     sim.guerres = s["guerres"]
+    sim.accidents = [tuple(a) for a in s.get("accidents", [])]
     sim.langues = s["langues"]
     sim._prochaine_langue = s["prochaine_langue"]
     sim.dictionnaire = {k: set(v) for k, v in s["dictionnaire"].items()}
@@ -137,7 +140,11 @@ def _monde_vers_dict(monde):
                 "nourriture": nourriture,
                 "morceaux": [list(c) for c in sorted(monde._chunks_charges)]}
     return {"type": "fini", "largeur": monde.largeur, "hauteur": monde.hauteur,
-            "terre": [list(c) for c in monde.cases_terre()], "nourriture": nourriture}
+            "terre": [list(c) for c in monde.cases_terre()], "nourriture": nourriture,
+            "altitude": [[x, y, a] for (x, y), a in getattr(monde, "altitude", {}).items()],
+            "population": [[x, y, c] for (x, y), c in getattr(monde, "population", {}).items()],
+            "eau": [list(c) for c in monde.points_eau] if monde.points_eau is not None else None,
+            "grille": getattr(monde, "grille", None)}
 
 
 def _monde_depuis_dict(m):
@@ -149,6 +156,11 @@ def _monde_depuis_dict(m):
         return monde
     monde = Monde(m["largeur"], m["hauteur"], [tuple(c) for c in m["terre"]])
     monde.nourriture = {_cle(c): q for c, q in m["nourriture"].items()}
+    monde.altitude = {(x, y): a for x, y, a in m.get("altitude", [])}
+    monde.population = {(x, y): c for x, y, c in m.get("population", [])}
+    monde.points_eau = {tuple(c) for c in m["eau"]} if m.get("eau") is not None else None
+    if m.get("grille"):
+        monde.grille = m["grille"]
     return monde
 
 

@@ -12,6 +12,9 @@ from .peuples import en_contact, peuples, relation
 from .priere import (DUREE_PRIERE, EXAUCER, IGNORER, MODIFIER, REFUSER,
                      Priere, besoins_pressants)
 
+PERTE_SOIF = 0.8  # soif gagnée par tour (si la carte a des points d'eau)
+EAU_BU = 50.0  # soif calmée par une gorgée complète
+PORTEE_EAU = 80  # nombre de pas maximum pour chercher de l'eau
 PERTE_GUERRE = 0.8  # énergie perdue par tour pendant une guerre entre peuples
 PROBA_PRIERE = 0.05  # chance par tour de formuler une prière, multipliée par la foi
 COOLDOWN_PRIERE = 40  # tours minimum entre deux prières d'une même personne
@@ -51,6 +54,7 @@ class Simulation:
         self._prochaine_priere = 0
         self.culture = Culture()
         self.guerres = 0  # nombre de tours où deux peuples en contact étaient en guerre
+        self.accidents = []  # (tour, identifiant du peuple) pour les accidents nucléaires
         self.langues = {}  # identifiant -> langue (voir terre/langue.py)
         self.dictionnaire = {}  # identifiant de langue -> concepts que le joueur a appris
         self._prochaine_langue = 0
@@ -63,6 +67,8 @@ class Simulation:
         for p in self.vivantes():
             p.age += 1
             p.faim += PERTE_FAIM
+            if self._eau_active():
+                p.soif += PERTE_SOIF
             p.oublier()
         for p in self.vivantes():
             self._agir(p)
@@ -72,10 +78,14 @@ class Simulation:
         self._verifier_schismes()
         self._conflits()
         self._attribuer_langues()
+        from .economie import verifier_accidents
+        verifier_accidents(self)
         self.culture.mettre_a_jour(self.tour, self.personnes, self._groupes(), self.rng)
         for p in self.vivantes():
             if p.meurt_de_faim():
                 self._mourir(p, "faim")
+            elif self._eau_active() and p.meurt_de_soif():
+                self._mourir(p, "soif")
             elif p.meurt_de_vieillesse():
                 self._mourir(p, "vieillesse")
         self._naissances()
@@ -242,7 +252,51 @@ class Simulation:
 
     # Actions individuelles
 
+    def _eau_active(self):
+        return getattr(self.monde, "points_eau", None) is not None
+
+    def _chercher_eau(self, p):
+        """Va boire au point d'eau le plus proche, par un parcours en largeur sur la terre."""
+        eau = self.monde.points_eau
+        if p.case in eau:
+            p.soif = max(0.0, p.soif - EAU_BU)
+            p.ajouter_souvenir("a trouvé de l'eau", 1.0)
+            return
+        depart = p.case
+        parent = {depart: None}
+        file = [depart]
+        cible = None
+        for _ in range(PORTEE_EAU):
+            if not file:
+                break
+            suivants = []
+            for c in file:
+                for v in self.monde.voisins_terre(*c):
+                    if v in parent:
+                        continue
+                    parent[v] = c
+                    if v in eau:
+                        cible = v
+                        break
+                    suivants.append(v)
+                if cible is not None:
+                    break
+            if cible is not None:
+                break
+            file = suivants
+        if cible is None:
+            self._errer(p)
+            return
+        premier = cible
+        while parent[premier] != depart:
+            premier = parent[premier]
+        p.x, p.y = premier
+
     def _agir(self, p):
+        if self._eau_active() and p.a_soif():
+            self._chercher_eau(p)
+            p.energie = max(0.0, p.energie - PERTE_ENERGIE)
+            return
         if p.a_faim():
             self._chercher_nourriture(p)
         elif p.est_fatigue():

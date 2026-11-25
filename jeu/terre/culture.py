@@ -23,6 +23,15 @@ TECHNIQUES = {
         Technique("agriculture", 25, ("feu", "outil_pierre")),
         Technique("ecriture", 60, ("agriculture",)),
         Technique("imprimerie", 120, ("ecriture",)),
+        # Sciences : apprises comme les techniques, à partir de la taille du groupe et des savoirs antérieurs.
+        Technique("mathematiques", 40, ("ecriture",)),
+        Technique("medecine", 60, ("ecriture",)),
+        Technique("histoire", 80, ("ecriture",)),
+        Technique("astronomie", 60, ("mathematiques",)),
+        Technique("physique", 100, ("mathematiques",)),
+        Technique("electricite", 150, ("physique",)),
+        Technique("physique_nucleaire", 250, ("physique", "electricite")),
+        Technique("informatique", 300, ("electricite", "mathematiques")),
     )
 }
 
@@ -32,6 +41,9 @@ EPOQUES = (
     ("Néolithique", ("agriculture",)),
     ("Antiquité", ("ecriture",)),
     ("Époque moderne", ("imprimerie",)),
+    ("Époque industrielle", ("electricite",)),
+    ("Époque nucléaire", ("physique_nucleaire",)),
+    ("Ère numérique", ("informatique",)),
 )
 
 

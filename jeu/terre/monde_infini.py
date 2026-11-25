@@ -52,6 +52,7 @@ class MondeInfini:
         self.limite = limite
         self.largeur, self.hauteur = limite if limite else (None, None)
         self.nourriture = {}
+        self.points_eau = None  # pas de soif simulée sur un monde infini (pas encore d'eau douce)
         self._chunks_charges = set()
 
     def _hauteur_brute(self, x, y):
