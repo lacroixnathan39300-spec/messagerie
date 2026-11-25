@@ -4,7 +4,7 @@
 
 Mis à jour à chaque tour de travail. Une tâche n'est cochée que si elle est vérifiée (tests ou démonstration). Pour recalculer la barre : `python3 avancement.py`.
 
-## Avancement global : 100 %
+## Avancement global : 95 %
 
 Calcul : moyenne des pourcentages des six phases. Phase 1 à 78 %, phases 2 à 6 non commencées.
 
@@ -71,3 +71,17 @@ Constat initial : sur une année, aucun couple ne se forme, car les rencontres s
 - [x] La Terre réelle est jouable à 0,5° (1 case ≈ 55 km à l'équateur). Le 1:1 (1 km par case) reste impossible en mémoire : 800 millions de cases.
 
 - Limite connue : les identifiants de peuples changent quand les groupes se recomposent, donc il y a plus de langues que de peuples (9 langues pour 2 peuples en démonstration).
+
+## Phase 9 : Zoom, bâtiments et ressources (55 %)
+
+- [x] Zoom sur une zone de quelques kilomètres, à 5 m par case
+- [x] Bâtiments à leurs dimensions réelles : maison 10 m, immeuble 25 m, bâtiment 50 m, aérogare 200 m × 50 m
+- [x] Routes, voitures et bus qui roulent sur les routes
+- [x] Aéroport : piste de 2 500 m, aérogare, avions au sol
+- [x] Villes et aéroports réels (243 villes, 5 653 aéroports avec code IATA), population réelle par case de 0,5°
+- [x] Vols réels entre aéroports, positionnés sur le grand cercle
+- [ ] Bâtiments réels (empreintes) et routes réelles : aucune donnée hors connexion, les zones sont générées selon la densité
+- [ ] Ressources réelles (forêts, mines, eau) : aujourd'hui des estimations à partir du relief, de la mer et de la latitude
+- [ ] Lignes de bus réelles et véhicules qui suivent un itinéraire
+- [ ] Avions animés en temps réel sur la carte du jeu (aujourd'hui une image à un instant donné)
+- [ ] Économie : ressources produites et consommées par les peuples

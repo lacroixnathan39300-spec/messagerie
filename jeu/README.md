@@ -40,6 +40,11 @@ Le script recalcule les pourcentages par phase et le pourcentage global, puis r�
 - `terre/monde_infini.py` : monde généré à partir d'une graine, ou carte PGM fournie
 - `terre/terre_reelle.py` : la Terre à 0,5° avec relief, chargée depuis `terre/donnees/terre_0_5deg.txt`
 - `tools/generer_terre.py` : reconstruit la grille de la Terre (à lancer une fois, avec Pillow)
+- `tools/generer_donnees.py` : prépare la population, les villes et les aéroports réels
+- `terre/zoom.py` : zone zoomée à 5 m par case (bâtiments, routes, véhicules, aéroport)
+- `terre/ressources.py` : population réelle, ressources estimées, vols réels entre aéroports
+- `terre/rendu.py` : images PNG de la Terre et des zones zoomées
+- `images/` : exemples générés (Paris, Roissy, la Terre avec villes et avions)
 
 ## Données de la Terre
 
