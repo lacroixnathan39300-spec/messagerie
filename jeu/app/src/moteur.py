@@ -23,6 +23,7 @@ def nouvelle_partie(graine=1):
     rng = random.Random(graine)
     cotes = sorted(monde.points_eau)
     personnes = [Personne(i, *rng.choice(cotes)) for i in range(NB_PERSONNES_DEPART)]
+    BASE["terre"] = set(monde.cases_terre())
     ETAT["sim"] = Simulation(monde, personnes, graine)
     ETAT["population"] = charger_population()
     return etat()
@@ -42,12 +43,14 @@ def avancer(tours):
 
 
 RAYON_FOUDRE = 3
+RAYON_PINCEAU = 2
+BASE = {"terre": None}  # terres d'origine de la carte, pour retrouver les changements après un chargement
 
 
 def agir(outil, i, j):
     """Pouvoir du joueur sur la case (i, j) : humain, buisson, foudre."""
     sim = _sim()
-    if not sim.monde.est_terre(i, j):
+    if outil in ("humain", "buisson") and not sim.monde.est_terre(i, j):
         return {"ok": False, "message": "C'est la mer.", "etat": etat()}
     if outil == "humain":
         sim.personnes.append(Personne(sim._prochain_id, i, j))
@@ -56,6 +59,23 @@ def agir(outil, i, j):
     elif outil == "buisson":
         sim.monde.nourriture[(i, j)] = NOURRITURE_MAX
         message = "Un buisson pousse."
+    elif outil in ("terre", "mer"):
+        voulu = outil == "terre"
+        noyes = 0
+        for dx in range(-RAYON_PINCEAU, RAYON_PINCEAU + 1):
+            for dy in range(-RAYON_PINCEAU, RAYON_PINCEAU + 1):
+                if dx * dx + dy * dy > RAYON_PINCEAU * RAYON_PINCEAU:
+                    continue
+                x, y = i + dx, j + dy
+                if sim.monde.est_terre(x, y) == voulu or not (0 <= x < sim.monde.largeur and 0 <= y < sim.monde.hauteur):
+                    continue
+                sim.monde.poser_terre(x, y, voulu)
+                if not voulu:
+                    for p in sim.vivantes():
+                        if p.x == x and p.y == y:
+                            sim._mourir(p, "noyade")
+                            noyes += 1
+        message = "Une terre apparaît." if voulu else f"La mer submerge la terre ({noyes} noyés)."
     elif outil == "foudre":
         touches = [p for p in sim.vivantes()
                    if abs(p.x - i) <= RAYON_FOUDRE and abs(p.y - j) <= RAYON_FOUDRE]
@@ -80,6 +100,7 @@ def etat():
         for pr in sim.prieres_en_attente()
     ]
     eau = sim._eau_active()
+    modifs = [[x, y, 1 if v else 0] for (x, y), v in getattr(sim.monde, "modifs", {}).items()]
     return {
         "bilan": sim.bilan(),
         "personnes": [
@@ -96,6 +117,7 @@ def etat():
             for b in economie.bilan_energie(sim)
         ],
         "eau_active": eau,
+        "modifs": modifs,
     }
 
 
@@ -127,5 +149,11 @@ def charger_texte(texte):
     with open(CHEMIN_SAUVEGARDE, "w", encoding="utf-8") as f:
         f.write(texte)
     ETAT["sim"] = sauvegarde.charger(CHEMIN_SAUVEGARDE, joueur=None)
+    BASE["terre"] = set(charger().cases_terre())
+    actuelle = set(ETAT["sim"].monde.cases_terre())
+    for c in actuelle - BASE["terre"]:
+        ETAT["sim"].monde.modifs[c] = True
+    for c in BASE["terre"] - actuelle:
+        ETAT["sim"].monde.modifs[c] = False
     ETAT["population"] = charger_population()
     return etat()

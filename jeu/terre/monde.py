@@ -12,6 +12,15 @@ class Monde:
         self.nourriture = {}  # (x, y) -> quantité entre 0 et NOURRITURE_MAX
         # Points d'eau douce. None = la soif n'est pas simulée sur cette carte.
         self.points_eau = None
+        # Changements faits par le joueur : (x, y) -> True (terre ajoutée) ou False (mer ajoutée).
+        self.modifs = {}
+
+    def poser_terre(self, x, y, terre):
+        if terre:
+            self._terre.add((x, y))
+        else:
+            self._terre.discard((x, y))
+        self.modifs[(x, y)] = terre
 
     def est_terre(self, x, y):
         return (x, y) in self._terre
