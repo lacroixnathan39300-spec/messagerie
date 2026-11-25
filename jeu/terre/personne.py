@@ -29,6 +29,7 @@ class Personne:
     schismatique: bool = False  # True une fois entrée dans un groupe qui s'est séparé
     derniere_priere: int = -1000  # tour de la dernière prière formulée
     savoirs: set = field(default_factory=set)  # techniques que cette personne connaît
+    langue: str = ""  # identifiant de la langue parlée par son peuple
 
     @property
     def case(self):

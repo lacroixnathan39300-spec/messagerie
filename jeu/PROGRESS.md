@@ -4,7 +4,7 @@
 
 Mis à jour à chaque tour de travail. Une tâche n'est cochée que si elle est vérifiée (tests ou démonstration). Pour recalculer la barre : `python3 avancement.py`.
 
-## Avancement global : 74 %
+## Avancement global : 87 %
 
 Calcul : moyenne des pourcentages des six phases. Phase 1 à 78 %, phases 2 à 6 non commencées.
 
@@ -51,7 +51,14 @@ Constat initial : sur une année, aucun couple ne se forme, car les rencontres s
 - [x] Zoom : planète, région, territoire, personne (vitesse du temps par échelle)
 - [x] Plusieurs peuples qui échangent ou se font la guerre (les peuples en guerre perdent de l'énergie et s'irritent)
 
-## Phase 6 : Figures (0 %)
+## Phase 6 : Figures (100 %)
 
-- [ ] Modèle de langage pour quelques personnages clés
-- [ ] Décisions cohérentes avec la mémoire du personnage
+- [x] Figures clés qui parlent hors connexion : phrases à partir de modèles, sans modèle de langage ni clé d'API (choix du joueur)
+- [x] Décisions cohérentes avec la mémoire du personnage (poids des souvenirs, prudence)
+
+## Phase 7 : Hors connexion (67 %)
+
+- [x] Sauvegarde locale de la partie dans un fichier JSON (écriture atomique, reprise identique)
+- [x] Langues inventées par chaque peuple, qui dérivent et s'empruntent, traduites pour le joueur
+- [ ] Apprentissage du vocabulaire par le joueur au fil de la partie (la mécanique existe, pas encore branchée au jeu)
+- Limite connue : les identifiants de peuples changent quand les groupes se recomposent, donc il y a plus de langues que de peuples (9 langues pour 2 peuples en démonstration).

@@ -34,6 +34,17 @@ Le script recalcule les pourcentages par phase et le pourcentage global, puis r�
 - `terre/culture.py` : techniques, pertes de savoirs et époques
 - `terre/peuples.py` : groupes assez nombreux, échange ou guerre entre eux
 - `terre/echelles.py` : zoom (planète, région, territoire, personne) et vitesse du temps
+- `terre/figures.py` : personnages clés qui décident et parlent à partir de leur mémoire
+- `terre/langue.py` : langues inventées par les peuples, avec dérive et emprunts
+- `terre/sauvegarde.py` : sauvegarde et reprise de la partie dans un fichier JSON
+
+## Sauvegarder la partie
+
+    from terre.sauvegarde import sauvegarder, charger
+    sauvegarder(sim, "partie.json")
+    sim = charger("partie.json", joueur=ma_politique)
+
+Le fichier reste sur l'appareil, sans connexion. Sur Android, donner le chemin du dossier privé de l'appli.
 - `run_demo.py` : démonstration d'une année simulée avec un joueur simulé
 - `avancement.py` : calcule la barre d'avancement à partir de `PROGRESS.md`
 - `tests/` : tests automatiques

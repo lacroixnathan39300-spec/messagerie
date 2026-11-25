@@ -3,6 +3,7 @@ import random
 
 from .personne import SEUIL_FAIM, Personne
 from .culture import PROBA_TRANSMISSION, Culture
+from .langue import PROBA_DERIVE, PROBA_EMPRUNT, creer as creer_langue, deriver, emprunter
 from .peuples import en_contact, peuples, relation
 from .priere import (DUREE_PRIERE, EXAUCER, IGNORER, MODIFIER, REFUSER,
                      Priere, besoins_pressants)
@@ -34,6 +35,7 @@ class Simulation:
         self.monde = monde
         self.personnes = list(personnes)
         self.tour = 0
+        self.graine = graine
         self.rng = random.Random(graine)
         self.morts = []  # liste de (tour, identifiant, cause)
         self.naissances = 0
@@ -45,6 +47,8 @@ class Simulation:
         self._prochaine_priere = 0
         self.culture = Culture()
         self.guerres = 0  # nombre de tours où deux peuples en contact étaient en guerre
+        self.langues = {}  # identifiant -> langue (voir terre/langue.py)
+        self.dictionnaire = {}  # identifiant de langue -> concepts que le joueur a appris
 
     def vivantes(self):
         return [p for p in self.personnes if p.vivante]
@@ -62,6 +66,7 @@ class Simulation:
         self._traiter_prieres()
         self._verifier_schismes()
         self._conflits()
+        self._attribuer_langues()
         self.culture.mettre_a_jour(self.tour, self.personnes, self._groupes(), self.rng)
         for p in self.vivantes():
             if p.meurt_de_faim():
@@ -90,21 +95,46 @@ class Simulation:
             "techniques": sorted(self.culture.connues),
             "peuples": len(peuples(self._groupes())),
             "guerres": self.guerres,
+            "langues": len(self.langues),
         }
 
     # Peuples
 
     def _conflits(self):
-        """Deux peuples en contact en guerre s'épuisent et s'irritent mutuellement."""
+        """Deux peuples en contact en guerre s'épuisent et s'irritent mutuellement.
+        Deux peuples en contact en paix peuvent emprunter des mots l'un à l'autre."""
         liste = peuples(self._groupes())
         for i, a in enumerate(liste):
             for b in liste[i + 1:]:
                 # Deux peuples distincts sont séparés de plus de RAYON_VISION : le contact porte plus loin.
-                if en_contact(a, b, self._distance, 2 * RAYON_VISION) and relation(a, b) == "guerre":
+                if not en_contact(a, b, self._distance, 2 * RAYON_VISION):
+                    continue
+                if relation(a, b) == "guerre":
                     self.guerres += 1
                     for p in a.membres + b.membres:
                         p.energie = max(0.0, p.energie - PERTE_GUERRE)
                         p.colere = min(1.0, p.colere + 0.005)
+                else:
+                    self._emprunts(a, b)
+
+    def _emprunts(self, a, b):
+        langue_a = self.langues.get(a.membres[0].langue)
+        langue_b = self.langues.get(b.membres[0].langue)
+        if langue_a and langue_b and langue_a is not langue_b and self.rng.random() < PROBA_EMPRUNT:
+            emprunter(langue_a, langue_b, self.rng)
+
+    def _attribuer_langues(self):
+        """Chaque peuple a une langue ; elle dérive lentement."""
+        for peuple in peuples(self._groupes()):
+            identifiant = str(peuple.identifiant)
+            if identifiant not in self.langues:
+                self.langues[identifiant] = creer_langue(self.graine, identifiant)
+            for p in peuple.membres:
+                if not p.langue:
+                    p.langue = identifiant
+        for langue in self.langues.values():
+            if self.rng.random() < PROBA_DERIVE:
+                deriver(langue, self.rng)
 
     # Prières
 
@@ -363,7 +393,7 @@ class Simulation:
             # Un couple vit ensemble dès qu'il est à deux cases au plus.
             if (self._distance(p.case, q.case) <= 2 and p.faim < SEUIL_FAIM and q.faim < SEUIL_FAIM
                     and self.rng.random() < PROBA_NAISSANCE):
-                enfant = Personne(self._prochain_id, p.x, p.y)
+                enfant = Personne(self._prochain_id, p.x, p.y, langue=p.langue)
                 self._prochain_id += 1
                 self.personnes.append(enfant)
                 p.enfants.append(enfant.identifiant)
