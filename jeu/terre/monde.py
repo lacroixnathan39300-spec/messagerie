@@ -14,6 +14,8 @@ class Monde:
         self.points_eau = None
         # Changements faits par le joueur : (x, y) -> True (terre ajoutée) ou False (mer ajoutée).
         self.modifs = {}
+        # Montagnes posées par le joueur (sous-ensemble des cases de terre).
+        self.montagnes = set()
 
     def poser_terre(self, x, y, terre):
         if terre:

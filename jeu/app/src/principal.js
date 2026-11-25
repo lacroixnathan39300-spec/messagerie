@@ -106,6 +106,10 @@ function dessinerCarte() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(fondTerre, decalage.x, decalage.y, LARGEUR_TERRE * s, HAUTEUR_TERRE * s);
+  for (const [x, y] of etat.montagnes) {
+    ctx.fillStyle = "rgb(120,110,100)";
+    ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.ceil(s), Math.ceil(s));
+  }
   for (const [x, y, terre] of etat.modifs) {
     ctx.fillStyle = terre ? "rgb(120,160,80)" : "rgb(150,190,220)";
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.ceil(s), Math.ceil(s));

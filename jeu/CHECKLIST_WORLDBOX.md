@@ -15,7 +15,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 ## Terrain
 - ✅ Terre ajoutée sur la mer
 - ✅ Mer qui submerge la terre (noie les personnes)
-- ❌ Montagnes (relief qui monte)
+- ✅ Montagnes (pinceau, visibles et sauvegardées ; l'effet sur la vie n'est pas encore simulé)
 - ❌ Plages, forêts, neige, lave, désert comme types de sol distincts
 - ❌ Rivières et lacs
 - ❌ Affichage net de la terre ajoutée à petit zoom

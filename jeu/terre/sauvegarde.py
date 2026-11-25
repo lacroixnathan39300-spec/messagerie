@@ -141,6 +141,7 @@ def _monde_vers_dict(monde):
                 "morceaux": [list(c) for c in sorted(monde._chunks_charges)]}
     return {"type": "fini", "largeur": monde.largeur, "hauteur": monde.hauteur,
             "terre": [list(c) for c in monde.cases_terre()], "nourriture": nourriture,
+            "montagnes": [list(c) for c in sorted(getattr(monde, "montagnes", set()))],
             "altitude": [[x, y, a] for (x, y), a in getattr(monde, "altitude", {}).items()],
             "population": [[x, y, c] for (x, y), c in getattr(monde, "population", {}).items()],
             "eau": [list(c) for c in monde.points_eau] if monde.points_eau is not None else None,
@@ -157,6 +158,7 @@ def _monde_depuis_dict(m):
     monde = Monde(m["largeur"], m["hauteur"], [tuple(c) for c in m["terre"]])
     monde.nourriture = {_cle(c): q for c, q in m["nourriture"].items()}
     monde.altitude = {(x, y): a for x, y, a in m.get("altitude", [])}
+    monde.montagnes = {tuple(c) for c in m.get("montagnes", [])}
     monde.population = {(x, y): c for x, y, c in m.get("population", [])}
     monde.points_eau = {tuple(c) for c in m["eau"]} if m.get("eau") is not None else None
     if m.get("grille"):

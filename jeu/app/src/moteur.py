@@ -59,6 +59,17 @@ def agir(outil, i, j, rayon=2):
     elif outil == "buisson":
         sim.monde.nourriture[(i, j)] = NOURRITURE_MAX
         message = "Un buisson pousse."
+    elif outil == "montagne":
+        posees = 0
+        for dx in range(-rayon, rayon + 1):
+            for dy in range(-rayon, rayon + 1):
+                if dx * dx + dy * dy > rayon * rayon:
+                    continue
+                c = (i + dx, j + dy)
+                if sim.monde.est_terre(*c) and c not in sim.monde.montagnes:
+                    sim.monde.montagnes.add(c)
+                    posees += 1
+        message = f"Des montagnes se dressent ({posees} cases)." if posees else "Il faut de la terre pour une montagne."
     elif outil in ("terre", "mer"):
         voulu = outil == "terre"
         noyes = 0
@@ -101,6 +112,7 @@ def etat():
     ]
     eau = sim._eau_active()
     modifs = [[x, y, 1 if v else 0] for (x, y), v in getattr(sim.monde, "modifs", {}).items()]
+    montagnes = [list(c) for c in getattr(sim.monde, "montagnes", set())]
     return {
         "bilan": sim.bilan(),
         "personnes": [
@@ -118,6 +130,7 @@ def etat():
         ],
         "eau_active": eau,
         "modifs": modifs,
+        "montagnes": montagnes,
     }
 
 
