@@ -12,7 +12,7 @@ const COULEURS_ZONE = {
   5: [200,220,140], 6: [60,60,60], 7: [240,200,60], 8: [150,120,100] };
 const MER = [150, 190, 220];
 
-let py, etat = null, enCours = false, zoomCarte = 1, decalage = { x: 0, y: 0 };
+let py, etat = null, enCours = true, zoomCarte = 1, decalage = { x: 0, y: 0 };
 let fondTerre = null, dernierClic = null;
 
 function appeler(expression) {
@@ -153,6 +153,20 @@ function afficherChronique() {
     `<div class="ligne">Tour ${e.tour} : ${e.texte}</div>`).join("");
 }
 
+let delaiMessage = null;
+function message(texte) {
+  $("message").textContent = texte;
+  clearTimeout(delaiMessage);
+  delaiMessage = setTimeout(() => { $("message").textContent = ""; }, 3000);
+}
+
+function agir(i, j) {
+  const r = appeler(`moteur.agir('${$("outil").value}', ${i}, ${j})`);
+  etat = r.etat;
+  message(r.message);
+  rendre();
+}
+
 function avancer() {
   etat = appeler(`moteur.avancer(${$("vitesse").value})`);
   rendre();
@@ -162,10 +176,10 @@ function lier() {
   $("lecture").onclick = () => { enCours = !enCours; rendre(); };
   $("zoom+").onclick = () => { zoomCarte *= 1.4; rendre(); };
   $("zoom-").onclick = () => { zoomCarte = Math.max(0.5, zoomCarte / 1.4); rendre(); };
-  $("sauver").onclick = () => { localStorage.setItem(CLE_SAUVEGARDE, py.runPython("moteur.sauver()")); alert("Partie sauvegardée sur ce téléphone."); };
+  $("sauver").onclick = () => { localStorage.setItem(CLE_SAUVEGARDE, py.runPython("moteur.sauver()")); message("Partie sauvegardée sur ce téléphone."); };
   $("charger").onclick = () => {
     const sauve = localStorage.getItem(CLE_SAUVEGARDE);
-    if (!sauve) { alert("Aucune sauvegarde."); return; }
+    if (!sauve) { message("Aucune sauvegarde."); return; }
     py.globals.set("texte_entree", sauve);
     etat = JSON.parse(py.runPython("import json, moteur\njson.dumps(moteur.charger_texte(texte_entree))"));
     rendre();
@@ -201,7 +215,8 @@ function lier() {
 function toucher(e) {
   const rect = $("carte").getBoundingClientRect();
   const px = (e.clientX - rect.left) * devicePixelRatio, py_ = (e.clientY - rect.top) * devicePixelRatio;
-  const i = (px - decalage.x) / zoomCarte, j = (py_ - decalage.y) / zoomCarte;
+  const i = Math.round((px - decalage.x) / zoomCarte), j = Math.round((py_ - decalage.y) / zoomCarte);
+  if ($("outil").value !== "voir") { agir(i, j); return; }
   let meilleure = null, distance = Infinity;
   for (const p of etat.personnes) {
     const d = Math.hypot(p.x - i, p.y - j);

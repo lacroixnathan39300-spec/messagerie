@@ -8,6 +8,7 @@ import random
 from terre import economie, histoire, sauvegarde, zoom
 from terre.personne import Personne
 from terre.priere import TEXTES
+from terre.monde import NOURRITURE_MAX
 from terre.ressources import charger_population
 from terre.simulation import Simulation
 from terre.terre_reelle import charger, semer_buissons
@@ -38,6 +39,32 @@ def avancer(tours):
     for _ in range(tours):
         sim.tour_suivant()
     return etat()
+
+
+RAYON_FOUDRE = 3
+
+
+def agir(outil, i, j):
+    """Pouvoir du joueur sur la case (i, j) : humain, buisson, foudre."""
+    sim = _sim()
+    if not sim.monde.est_terre(i, j):
+        return {"ok": False, "message": "C'est la mer.", "etat": etat()}
+    if outil == "humain":
+        sim.personnes.append(Personne(sim._prochain_id, i, j))
+        sim._prochain_id += 1
+        message = "Une personne apparaît."
+    elif outil == "buisson":
+        sim.monde.nourriture[(i, j)] = NOURRITURE_MAX
+        message = "Un buisson pousse."
+    elif outil == "foudre":
+        touches = [p for p in sim.vivantes()
+                   if abs(p.x - i) <= RAYON_FOUDRE and abs(p.y - j) <= RAYON_FOUDRE]
+        for p in touches:
+            sim._mourir(p, "foudre")
+        message = f"La foudre frappe : {len(touches)} morts."
+    else:
+        return {"ok": False, "message": "Outil inconnu.", "etat": etat()}
+    return {"ok": True, "message": message, "etat": etat()}
 
 
 def decider(identifiant_priere, choix):
