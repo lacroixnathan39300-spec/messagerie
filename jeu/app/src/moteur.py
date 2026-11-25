@@ -79,6 +79,24 @@ def agir(outil, i, j, rayon=2):
             for dy in range(-rayon, rayon + 1):
                 sim.monde.nourriture.pop((i + dx, j + dy), None)
         message = f"Le feu ravage la zone : {len(touches)} morts, les buissons brûlent."
+    elif outil == "seisme":
+        rayon_seisme = rayon * 3
+        touches = [p for p in sim.vivantes()
+                   if abs(p.x - i) <= rayon_seisme and abs(p.y - j) <= rayon_seisme]
+        for p in touches:
+            sim._mourir(p, "séisme")
+        for dx in range(-rayon_seisme, rayon_seisme + 1):
+            for dy in range(-rayon_seisme, rayon_seisme + 1):
+                sim.monde.nourriture.pop((i + dx, j + dy), None)
+        message = f"Un tremblement de terre frappe : {len(touches)} morts."
+    elif outil == "peste":
+        # Une personne sur trois dans la zone meurt de la peste (effet immédiat).
+        touches = [p for p in sim.vivantes()
+                   if abs(p.x - i) <= rayon and abs(p.y - j) <= rayon]
+        malades = touches[::3]
+        for p in malades:
+            sim._mourir(p, "peste")
+        message = f"La peste fait {len(malades)} morts."
     elif outil == "montagne":
         posees = 0
         for dx in range(-rayon, rayon + 1):

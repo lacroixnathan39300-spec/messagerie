@@ -37,8 +37,8 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Foudre (tue dans un petit rayon)
 - ✅ Pluie (fait repousser les buissons ; neige et sécheresse à faire)
 - 🟡 Feu (brûle immédiatement une zone ; ne se propage pas encore)
-- ❌ Tremblement de terre, tornade, météorite
-- ❌ Peste (qui se propage entre les personnes)
+- 🟡 Tremblement de terre (effet immédiat ; tornade et météorite à faire)
+- 🟡 Peste (effet immédiat sur une personne sur trois ; ne se propage pas encore)
 - ❌ Bombes et armes
 
 ## Monde
