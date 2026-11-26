@@ -76,6 +76,7 @@ def _reinitialiser_fleaux():
     ETAT["villages"] = []  # [x, y, maisons] : villages fondés par les peuples
     ETAT["routes"] = []   # [x, y] : cases de route entre villages
     ETAT["vehicules"] = []  # [x, y] : véhicules qui roulent sur les routes
+    ETAT["guerres"] = []    # [x1, y1, x2, y2] : peuples en guerre qui se touchent
     ETAT["jour_village"] = 0
 
 
@@ -121,6 +122,24 @@ def _tracer_routes(sim):
 DISTANCE_ROUTE = 12
 
 
+def _reperer_guerres(sim):
+    """Deux peuples en guerre dont les membres sont proches : une ligne de guerre les relie."""
+    from terre.peuples import peuples, relation
+    groupes = peuples(sim._groupes())
+    lignes = []
+    for a in range(len(groupes)):
+        for b in range(a + 1, len(groupes)):
+            if relation(groupes[a], groupes[b]) != "guerre":
+                continue
+            x1 = round(sum(p.x for p in groupes[a].membres) / len(groupes[a].membres))
+            y1 = round(sum(p.y for p in groupes[a].membres) / len(groupes[a].membres))
+            x2 = round(sum(p.x for p in groupes[b].membres) / len(groupes[b].membres))
+            y2 = round(sum(p.y for p in groupes[b].membres) / len(groupes[b].membres))
+            if max(abs(x1 - x2), abs(y1 - y2)) <= 12:
+                lignes.append([x1, y1, x2, y2])
+    ETAT["guerres"] = lignes
+
+
 def _propager(sim):
     """Évolution quotidienne du feu et de la peste."""
     ETAT["jour_village"] = ETAT.get("jour_village", 0) + 1
@@ -128,6 +147,7 @@ def _propager(sim):
         ETAT["jour_village"] = 0
         _fonder_villages(sim)
         _tracer_routes(sim)
+        _reperer_guerres(sim)
     feux = ETAT.setdefault("feux", {})
     for c, restant in list(feux.items()):
         x, y = c
@@ -354,6 +374,7 @@ def etat():
         "villages": [list(v) for v in ETAT.get("villages", [])],
         "routes": [list(r) for r in ETAT.get("routes", [])],
         "vehicules": [list(v) for v in ETAT.get("vehicules", [])],
+        "guerres": [list(g) for g in ETAT.get("guerres", [])],
         "largeur": sim.monde.largeur,
         "hauteur": sim.monde.hauteur,
         "terre": [list(c) for c in sim.monde.cases_terre()] if ETAT.get("carte", "terre") != "terre" else None,

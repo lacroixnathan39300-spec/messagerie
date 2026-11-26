@@ -154,6 +154,11 @@ function dessinerCarte() {
   for (const [x, y] of etat.vehicules) {
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(2, s * 0.9), Math.max(2, s * 0.9));
   }
+  ctx.strokeStyle = "rgba(220,38,38,0.9)"; ctx.lineWidth = Math.max(1.5, s * 0.5); ctx.setLineDash([s * 2, s]);
+  for (const [x1, y1, x2, y2] of etat.guerres) {
+    ctx.beginPath(); ctx.moveTo(decalage.x + x1 * s, decalage.y + y1 * s); ctx.lineTo(decalage.x + x2 * s, decalage.y + y2 * s); ctx.stroke();
+  }
+  ctx.setLineDash([]);
   const POSITIONS_MAISONS = [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, 2], [-2, 2], [2, -2]];
   for (const [x, y, maisons] of etat.villages) {
     const cx = decalage.x + x * s, cy = decalage.y + y * s, taille = Math.max(3, s * 2);

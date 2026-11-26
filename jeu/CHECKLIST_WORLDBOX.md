@@ -26,7 +26,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - 🟡 Personnes (naissance, mort, faim, soif, prières)
 - ✅ Animaux : moutons et loups marchent sur la terre (le loup mange le mouton), poissons nagent dans la mer ; sauvegardés
 - ❌ Créatures spéciales (dragons, zombies…)
-- ❌ Rencontres et combats entre peuples
+- 🟡 Rencontres entre peuples : une ligne rouge relie deux peuples en guerre et proches (code testé, guerre pas encore observée)
 
 ## Civilisation
 - 🟡 Peuples, guerres, échanges, schismes (calculés, mais peu visibles sur la carte)
