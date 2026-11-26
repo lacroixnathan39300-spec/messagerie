@@ -9,7 +9,7 @@ import random
 from terre import economie, histoire, sauvegarde, zoom
 from terre.personne import Personne
 from terre.priere import TEXTES
-from terre.monde import NOURRITURE_MAX, creer_ile
+from terre.monde import NOURRITURE_MAX, creer_archipel, creer_ile
 from terre.ressources import charger_population
 from terre.simulation import Simulation
 from terre.terre_reelle import charger, semer_buissons
@@ -21,13 +21,13 @@ CHEMIN_SAUVEGARDE = "/partie.json"
 
 def nouvelle_partie(graine=1, carte="terre"):
     rng = random.Random(graine)
-    if carte == "ile":
-        monde = creer_ile(graine)
+    if carte in ("ile", "archipel"):
+        monde = creer_archipel(graine) if carte == "archipel" else creer_ile(graine)
         monde.points_eau = {c for c in monde.cases_terre()
                             if any(not monde.est_terre(c[0] + dx, c[1] + dy)
                                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))}
         BASE["terre"] = None  # pas de carte de référence : tout est d'origine
-        ETAT["carte"] = "ile"
+        ETAT["carte"] = carte
     else:
         monde = charger()
         BASE["terre"] = set(monde.cases_terre())
@@ -266,7 +266,7 @@ def etat():
     eau = sim._eau_active()
     modifs = [[x, y, 1 if v else 0] for (x, y), v in getattr(sim.monde, "modifs", {}).items()]
     animaux = [list(a) for a in ETAT.get("animaux", [])]
-    villes = _villes_cases() if ETAT.get("carte") != "ile" else []
+    villes = _villes_cases() if ETAT.get("carte", "terre") == "terre" else []
     montagnes = [list(c) for c in getattr(sim.monde, "montagnes", set())]
     return {
         "bilan": sim.bilan(),
@@ -292,7 +292,7 @@ def etat():
         "animaux": animaux,
         "largeur": sim.monde.largeur,
         "hauteur": sim.monde.hauteur,
-        "terre": [list(c) for c in sim.monde.cases_terre()] if ETAT.get("carte") == "ile" else None,
+        "terre": [list(c) for c in sim.monde.cases_terre()] if ETAT.get("carte", "terre") != "terre" else None,
         "villes": villes,
     }
 
@@ -348,7 +348,7 @@ def charger_texte(texte):
         for c in BASE["terre"] - actuelle:
             ETAT["sim"].monde.modifs[c] = False
     else:
-        ETAT["carte"] = "ile"
+        ETAT["carte"] = "ile" if ETAT["sim"].monde.largeur == 40 else "archipel"
         BASE["terre"] = None
     ETAT["population"] = charger_population()
     return etat()

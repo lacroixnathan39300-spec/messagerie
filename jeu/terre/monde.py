@@ -49,6 +49,25 @@ class Monde:
         return False
 
 
+def creer_archipel(graine, largeur=80, hauteur=60, nb_iles=5, nb_buissons=30):
+    """Crée un archipel de plusieurs îles, toujours le même pour une graine donnée."""
+    rng = random.Random(graine)
+    terre = set()
+    for _ in range(nb_iles):
+        cx = rng.uniform(8, largeur - 8)
+        cy = rng.uniform(8, hauteur - 8)
+        rayon = rng.uniform(5, 11)
+        for y in range(hauteur):
+            for x in range(largeur):
+                distance = ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5
+                if distance + rng.uniform(-1.2, 1.2) < rayon:
+                    terre.add((x, y))
+    monde = Monde(largeur, hauteur, terre)
+    for case in rng.sample(sorted(terre), min(nb_buissons, len(terre))):
+        monde.nourriture[case] = NOURRITURE_MAX
+    return monde
+
+
 def creer_ile(graine, largeur=40, hauteur=40, nb_buissons=12):
     """Crée une île irrégulière, toujours la même pour une graine donnée."""
     rng = random.Random(graine)
