@@ -73,10 +73,33 @@ def _reinitialiser_fleaux():
     ETAT["peste"] = set()  # identifiants des personnes malades
     ETAT["tornades"] = []  # [x, y, dx, dy, jours restants]
     ETAT["animaux"] = []   # [x, y, espèce] : "mouton" ou "loup"
+    ETAT["villages"] = []  # [x, y] : villages fondés par les peuples
+    ETAT["jour_village"] = 0
+
+
+INTERVALLE_VILLAGE = 30  # un peuple fonde un village tous les 30 jours au plus
+
+
+def _fonder_villages(sim):
+    """Chaque peuple assez nombreux pose un village au centre de ses membres, s'il n'y en a pas déjà un proche."""
+    from terre.peuples import peuples
+    villages = ETAT.setdefault("villages", [])
+    for peuple in peuples(sim._groupes()):
+        cx = round(sum(p.x for p in peuple.membres) / len(peuple.membres))
+        cy = round(sum(p.y for p in peuple.membres) / len(peuple.membres))
+        if not sim.monde.est_terre(cx, cy):
+            continue
+        if any(abs(vx - cx) <= 3 and abs(vy - cy) <= 3 for vx, vy in villages):
+            continue
+        villages.append([cx, cy])
 
 
 def _propager(sim):
     """Évolution quotidienne du feu et de la peste."""
+    ETAT["jour_village"] = ETAT.get("jour_village", 0) + 1
+    if ETAT["jour_village"] >= INTERVALLE_VILLAGE:
+        ETAT["jour_village"] = 0
+        _fonder_villages(sim)
     feux = ETAT.setdefault("feux", {})
     for c, restant in list(feux.items()):
         x, y = c
@@ -290,6 +313,7 @@ def etat():
         "modifs": modifs,
         "montagnes": montagnes,
         "animaux": animaux,
+        "villages": [list(v) for v in ETAT.get("villages", [])],
         "largeur": sim.monde.largeur,
         "hauteur": sim.monde.hauteur,
         "terre": [list(c) for c in sim.monde.cases_terre()] if ETAT.get("carte", "terre") != "terre" else None,
@@ -325,6 +349,7 @@ def sauver():
         "feux": [[x, y, t] for (x, y), t in ETAT.get("feux", {}).items()],
         "peste": sorted(ETAT.get("peste", set())),
         "tornades": ETAT.get("tornades", []),
+        "villages": ETAT.get("villages", []),
     }
     return json.dumps(d)
 
@@ -339,6 +364,7 @@ def charger_texte(texte):
     ETAT["feux"] = {(x, y): t for x, y, t in extras.get("feux", [])}
     ETAT["peste"] = set(extras.get("peste", []))
     ETAT["tornades"] = extras.get("tornades", [])
+    ETAT["villages"] = extras.get("villages", [])
     actuelle = set(ETAT["sim"].monde.cases_terre())
     if ETAT["sim"].monde.largeur == 720:
         ETAT["carte"] = "terre"
