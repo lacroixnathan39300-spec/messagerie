@@ -130,12 +130,15 @@ function dessinerCarte() {
       ctx.fillText(nom, cx + s, cy - s);
     }
   }
-  for (const [x, y] of etat.villages) {
+  const POSITIONS_MAISONS = [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, 2], [-2, 2], [2, -2]];
+  for (const [x, y, maisons] of etat.villages) {
     const cx = decalage.x + x * s, cy = decalage.y + y * s, taille = Math.max(3, s * 2);
     ctx.fillStyle = "#92400e";
     ctx.fillRect(cx - taille / 2, cy - taille / 2, taille, taille);
-    ctx.strokeStyle = "#fde68a"; ctx.lineWidth = 1;
-    ctx.strokeRect(cx - taille / 2, cy - taille / 2, taille, taille);
+    ctx.fillStyle = "#a8a29e";
+    for (const [dx, dy] of POSITIONS_MAISONS.slice(0, maisons - 1)) {
+      ctx.fillRect(cx + dx * s - taille / 4, cy + dy * s - taille / 4, taille / 2, taille / 2);
+    }
   }
   for (const [x, y, espece] of etat.animaux) {
     ctx.fillStyle = espece === "loup" ? "#6b7280" : espece === "poisson" ? "#38bdf8" : "#f5f5f4";

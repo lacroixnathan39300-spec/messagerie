@@ -78,6 +78,7 @@ def _reinitialiser_fleaux():
 
 
 INTERVALLE_VILLAGE = 30  # un peuple fonde un village tous les 30 jours au plus
+MAISONS_MAX = 8
 
 
 def _fonder_villages(sim):
@@ -89,9 +90,11 @@ def _fonder_villages(sim):
         cy = round(sum(p.y for p in peuple.membres) / len(peuple.membres))
         if not sim.monde.est_terre(cx, cy):
             continue
-        if any(abs(vx - cx) <= 3 and abs(vy - cy) <= 3 for vx, vy in villages):
-            continue
-        villages.append([cx, cy])
+        proche = next((v for v in villages if abs(v[0] - cx) <= 3 and abs(v[1] - cy) <= 3), None)
+        if proche is None:
+            villages.append([cx, cy, 1])  # 1 = nombre de maisons
+        elif proche[2] < MAISONS_MAX:
+            proche[2] += 1  # le village grandit tant que le peuple reste là
 
 
 def _propager(sim):
