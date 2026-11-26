@@ -119,6 +119,10 @@ function dessinerCarte() {
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s * 0.8), Math.max(1, s * 0.8));
   }
   const enPriere = new Set(etat.prieres.map((p) => p.auteur));
+  for (const [x, y, espece] of etat.animaux) {
+    ctx.fillStyle = espece === "loup" ? "#6b7280" : "#f5f5f4";
+    ctx.beginPath(); ctx.arc(decalage.x + x * s, decalage.y + y * s, Math.max(2, s * 1.2), 0, 2 * Math.PI); ctx.fill();
+  }
   for (const p of etat.personnes) {
     const cx = decalage.x + p.x * s, cy = decalage.y + p.y * s;
     if (enPriere.has(p.id)) {
@@ -232,6 +236,19 @@ function lier() {
     if (glisse && !glisse.moved) toucher(e);
     glisse = null;
   });
+  carte.style.touchAction = "none";
+  let pincement = null;
+  carte.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 2) pincement = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  }, { passive: true });
+  carte.addEventListener("touchmove", (e) => {
+    if (e.touches.length !== 2 || !pincement) return;
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    zoomCarte = Math.min(40, Math.max(0.5, zoomCarte * d / pincement));
+    pincement = d;
+    dessinerCarte();
+  }, { passive: true });
+  carte.addEventListener("touchend", () => { pincement = null; }, { passive: true });
   carte.addEventListener("wheel", (e) => {
     e.preventDefault();
     zoomCarte = Math.min(40, Math.max(0.5, zoomCarte * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));

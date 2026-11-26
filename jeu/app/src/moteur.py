@@ -55,6 +55,7 @@ def _reinitialiser_fleaux():
     ETAT["feux"] = {}      # case (x, y) -> jours restants de feu
     ETAT["peste"] = set()  # identifiants des personnes malades
     ETAT["tornades"] = []  # [x, y, dx, dy, jours restants]
+    ETAT["animaux"] = []   # [x, y, espèce] : "mouton" ou "loup"
 
 
 def _propager(sim):
@@ -75,6 +76,20 @@ def _propager(sim):
             if v not in feux and sim.monde.est_terre(*v) and random.random() < PROBA_FEU:
                 feux[v] = DUREE_FEU
 
+    animaux = ETAT.setdefault("animaux", [])
+    for a in animaux:
+        if random.random() < 0.5:
+            dx, dy = random.choice(((1, 0), (-1, 0), (0, 1), (0, -1)))
+            if sim.monde.est_terre(a[0] + dx, a[1] + dy):
+                a[0] += dx
+                a[1] += dy
+    if any(a[2] == "loup" for a in animaux):
+        moutons_manges = set()
+        for loup in (a for a in animaux if a[2] == "loup"):
+            for mouton in (a for a in animaux if a[2] == "mouton"):
+                if abs(loup[0] - mouton[0]) <= 1 and abs(loup[1] - mouton[1]) <= 1:
+                    moutons_manges.add(id(mouton))
+        animaux[:] = [a for a in animaux if id(a) not in moutons_manges]
     tornades = ETAT.setdefault("tornades", [])
     for t in tornades:
         t[0] += t[2]
@@ -172,6 +187,12 @@ def agir(outil, i, j, rayon=2):
                 if dx * dx + dy * dy <= rayon * rayon and sim.monde.est_terre(i + dx, j + dy):
                     sim.monde.poser_terre(i + dx, j + dy, False)
         message = f"Une météorite s'écrase : {len(touches)} morts, un cratère s'ouvre."
+    elif outil in ("mouton", "loup"):
+        if sim.monde.est_terre(i, j):
+            ETAT.setdefault("animaux", []).append([i, j, outil])
+            message = "Un mouton paît." if outil == "mouton" else "Un loup rôde."
+        else:
+            message = "C'est la mer."
     elif outil == "montagne":
         posees = 0
         for dx in range(-rayon, rayon + 1):
@@ -225,6 +246,7 @@ def etat():
     ]
     eau = sim._eau_active()
     modifs = [[x, y, 1 if v else 0] for (x, y), v in getattr(sim.monde, "modifs", {}).items()]
+    animaux = [list(a) for a in ETAT.get("animaux", [])]
     montagnes = [list(c) for c in getattr(sim.monde, "montagnes", set())]
     return {
         "bilan": sim.bilan(),
@@ -244,6 +266,7 @@ def etat():
         "eau_active": eau,
         "modifs": modifs,
         "montagnes": montagnes,
+        "animaux": animaux,
     }
 
 

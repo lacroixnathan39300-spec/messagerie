@@ -6,7 +6,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Carte plein écran avec barre d'outils en bas (catégories)
 - ✅ Pause / lecture, vitesse ×1 / ×5 / ×20
 - ✅ Zoom (boutons et molette)
-- 🟡 Pincer pour zoomer sur téléphone (le glissement marche, pas le pincement)
+- ✅ Pincer pour zoomer sur téléphone
 - ✅ Taille du pinceau réglable (petit / moyen / grand)
 - ❌ Panneau d'infos sur une personne : nom, âge, métier, peuple (aujourd'hui : soif, faim, foi)
 - ❌ Sauvegardes multiples et nommées
@@ -22,7 +22,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 
 ## Êtres
 - 🟡 Personnes (naissance, mort, faim, soif, prières)
-- ❌ Animaux (loups, moutons, poissons, etc.)
+- 🟡 Animaux (moutons et loups errent, le loup mange le mouton ; pas encore sauvegardés, pas de poissons)
 - ❌ Créatures spéciales (dragons, zombies…)
 - ❌ Rencontres et combats entre peuples
 
