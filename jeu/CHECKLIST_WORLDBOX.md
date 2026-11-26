@@ -9,7 +9,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Pincer pour zoomer sur téléphone
 - ✅ Taille du pinceau réglable (petit / moyen / grand)
 - ✅ Panneau d'infos sur une personne : âge, couple, enfants, langue, savoirs, soif, faim, foi
-- ❌ Sauvegardes multiples et nommées
+- ✅ Sauvegardes multiples (trois emplacements)
 - ❌ Menu de réglages (langue, sons, affichage)
 
 ## Terrain

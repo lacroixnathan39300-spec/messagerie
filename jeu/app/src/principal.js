@@ -2,7 +2,8 @@
 import { loadPyodide } from "./pyodide/pyodide.mjs";
 
 const $ = (id) => document.getElementById(id);
-const CLE_SAUVEGARDE = "terre-vivante-partie";
+const CLE_BASE = "terre-vivante-partie";
+const cle = () => CLE_BASE + "-" + $("emplacement").value;
 const LARGEUR_TERRE = 720, HAUTEUR_TERRE = 360;
 const COULEURS_ALTITUDE = [
   [120,170,90],[135,180,95],[160,185,100],[185,185,110],[195,175,115],
@@ -31,7 +32,7 @@ async function demarrer() {
   py.runPython("import sys\nsys.path.insert(0, '/app')\nimport moteur");
   fondTerre = construireFond(py.FS.readFile("/app/terre/donnees/terre_0_5deg.txt", { encoding: "utf8" }));
 
-  const sauve = localStorage.getItem(CLE_SAUVEGARDE);
+  const sauve = localStorage.getItem(cle());
   if (sauve) {
     py.globals.set("texte_entree", sauve);
     etat = JSON.parse(py.runPython("import json, moteur\njson.dumps(moteur.charger_texte(texte_entree))"));
@@ -51,7 +52,7 @@ async function demarrer() {
   window.addEventListener("resize", () => { ajusterCarte(); rendre(); });
   setTimeout(() => { ajusterCarte(); rendre(); }, 500);
   setInterval(() => { if (enCours) avancer(); }, 1000);  // 1 seconde = 1 tour (1 jour) à la vitesse ×1
-  setInterval(() => { localStorage.setItem(CLE_SAUVEGARDE, py.runPython("moteur.sauver()")); }, 30000);
+  setInterval(() => { localStorage.setItem(cle(), py.runPython("moteur.sauver()")); }, 30000);
 }
 
 function construireFond(texte) {
@@ -216,9 +217,9 @@ function lier() {
   $("lecture").onclick = () => { enCours = !enCours; rendre(); };
   $("zoom+").onclick = () => { zoomCarte *= 1.4; rendre(); };
   $("zoom-").onclick = () => { zoomCarte = Math.max(0.5, zoomCarte / 1.4); rendre(); };
-  $("sauver").onclick = () => { localStorage.setItem(CLE_SAUVEGARDE, py.runPython("moteur.sauver()")); message("Partie sauvegardée sur ce téléphone."); };
+  $("sauver").onclick = () => { localStorage.setItem(cle(), py.runPython("moteur.sauver()")); message("Partie sauvegardée sur ce téléphone."); };
   $("charger").onclick = () => {
-    const sauve = localStorage.getItem(CLE_SAUVEGARDE);
+    const sauve = localStorage.getItem(cle());
     if (!sauve) { message("Aucune sauvegarde."); return; }
     py.globals.set("texte_entree", sauve);
     etat = JSON.parse(py.runPython("import json, moteur\njson.dumps(moteur.charger_texte(texte_entree))"));
