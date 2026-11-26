@@ -75,6 +75,7 @@ def _reinitialiser_fleaux():
     ETAT["animaux"] = []   # [x, y, espèce] : "mouton" ou "loup"
     ETAT["villages"] = []  # [x, y, maisons] : villages fondés par les peuples
     ETAT["routes"] = []   # [x, y] : cases de route entre villages
+    ETAT["vehicules"] = []  # [x, y] : véhicules qui roulent sur les routes
     ETAT["jour_village"] = 0
 
 
@@ -142,6 +143,16 @@ def _propager(sim):
             v = (x + dx, y + dy)
             if v not in feux and sim.monde.est_terre(*v) and random.random() < PROBA_FEU:
                 feux[v] = DUREE_FEU
+
+    routes_set = {tuple(r) for r in ETAT.get("routes", [])}
+    vehicules = ETAT.setdefault("vehicules", [])
+    if routes_set and len(vehicules) < max(1, len(routes_set) // 4) and random.random() < 0.05:
+        vehicules.append(list(random.choice(sorted(routes_set))))
+    for v in vehicules:
+        voisins = [(v[0] + dx, v[1] + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))]
+        voisins = [c for c in voisins if c in routes_set]
+        if voisins:
+            v[0], v[1] = random.choice(voisins)
 
     animaux = ETAT.setdefault("animaux", [])
     for a in animaux:
@@ -342,6 +353,7 @@ def etat():
         "animaux": animaux,
         "villages": [list(v) for v in ETAT.get("villages", [])],
         "routes": [list(r) for r in ETAT.get("routes", [])],
+        "vehicules": [list(v) for v in ETAT.get("vehicules", [])],
         "largeur": sim.monde.largeur,
         "hauteur": sim.monde.hauteur,
         "terre": [list(c) for c in sim.monde.cases_terre()] if ETAT.get("carte", "terre") != "terre" else None,
@@ -379,6 +391,7 @@ def sauver():
         "tornades": ETAT.get("tornades", []),
         "villages": ETAT.get("villages", []),
         "routes": ETAT.get("routes", []),
+        "vehicules": ETAT.get("vehicules", []),
     }
     return json.dumps(d)
 
@@ -395,6 +408,7 @@ def charger_texte(texte):
     ETAT["tornades"] = extras.get("tornades", [])
     ETAT["villages"] = extras.get("villages", [])
     ETAT["routes"] = extras.get("routes", [])
+    ETAT["vehicules"] = extras.get("vehicules", [])
     actuelle = set(ETAT["sim"].monde.cases_terre())
     if ETAT["sim"].monde.largeur == 720:
         ETAT["carte"] = "terre"
