@@ -73,7 +73,8 @@ def _reinitialiser_fleaux():
     ETAT["peste"] = set()  # identifiants des personnes malades
     ETAT["tornades"] = []  # [x, y, dx, dy, jours restants]
     ETAT["animaux"] = []   # [x, y, espèce] : "mouton" ou "loup"
-    ETAT["villages"] = []  # [x, y] : villages fondés par les peuples
+    ETAT["villages"] = []  # [x, y, maisons] : villages fondés par les peuples
+    ETAT["routes"] = []   # [x, y] : cases de route entre villages
     ETAT["jour_village"] = 0
 
 
@@ -97,12 +98,35 @@ def _fonder_villages(sim):
             proche[2] += 1  # le village grandit tant que le peuple reste là
 
 
+def _tracer_routes(sim):
+    """Relie par une route deux villages assez proches et assez peuplés, sur la terre seulement."""
+    villages = [v for v in ETAT.get("villages", []) if v[2] >= 3]
+    routes = ETAT.setdefault("routes", [])
+    cases = {tuple(c) for c in routes}
+    for a in range(len(villages)):
+        for b in range(a + 1, len(villages)):
+            (x1, y1, _), (x2, y2, _) = villages[a], villages[b]
+            if abs(x1 - x2) + abs(y1 - y2) > DISTANCE_ROUTE:
+                continue
+            n = max(abs(x2 - x1), abs(y2 - y1))
+            for k in range(n + 1):
+                x = round(x1 + (x2 - x1) * k / n)
+                y = round(y1 + (y2 - y1) * k / n)
+                if sim.monde.est_terre(x, y) and (x, y) not in cases:
+                    cases.add((x, y))
+                    routes.append([x, y])
+
+
+DISTANCE_ROUTE = 12
+
+
 def _propager(sim):
     """Évolution quotidienne du feu et de la peste."""
     ETAT["jour_village"] = ETAT.get("jour_village", 0) + 1
     if ETAT["jour_village"] >= INTERVALLE_VILLAGE:
         ETAT["jour_village"] = 0
         _fonder_villages(sim)
+        _tracer_routes(sim)
     feux = ETAT.setdefault("feux", {})
     for c, restant in list(feux.items()):
         x, y = c
@@ -317,6 +341,7 @@ def etat():
         "montagnes": montagnes,
         "animaux": animaux,
         "villages": [list(v) for v in ETAT.get("villages", [])],
+        "routes": [list(r) for r in ETAT.get("routes", [])],
         "largeur": sim.monde.largeur,
         "hauteur": sim.monde.hauteur,
         "terre": [list(c) for c in sim.monde.cases_terre()] if ETAT.get("carte", "terre") != "terre" else None,
@@ -353,6 +378,7 @@ def sauver():
         "peste": sorted(ETAT.get("peste", set())),
         "tornades": ETAT.get("tornades", []),
         "villages": ETAT.get("villages", []),
+        "routes": ETAT.get("routes", []),
     }
     return json.dumps(d)
 
@@ -368,6 +394,7 @@ def charger_texte(texte):
     ETAT["peste"] = set(extras.get("peste", []))
     ETAT["tornades"] = extras.get("tornades", [])
     ETAT["villages"] = extras.get("villages", [])
+    ETAT["routes"] = extras.get("routes", [])
     actuelle = set(ETAT["sim"].monde.cases_terre())
     if ETAT["sim"].monde.largeur == 720:
         ETAT["carte"] = "terre"

@@ -146,6 +146,10 @@ function dessinerCarte() {
       ctx.fillText(nom, cx + s, cy - s);
     }
   }
+  ctx.fillStyle = "rgba(226,232,240,0.85)";
+  for (const [x, y] of etat.routes) {
+    ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s * 0.6), Math.max(1, s * 0.6));
+  }
   const POSITIONS_MAISONS = [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, 2], [-2, 2], [2, -2]];
   for (const [x, y, maisons] of etat.villages) {
     const cx = decalage.x + x * s, cy = decalage.y + y * s, taille = Math.max(3, s * 2);
