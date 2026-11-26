@@ -301,14 +301,27 @@ def zone(i, j, cote=200):
 def sauver():
     sauvegarde.sauvegarder(_sim(), CHEMIN_SAUVEGARDE)
     with open(CHEMIN_SAUVEGARDE, encoding="utf-8") as f:
-        return f.read()
+        d = json.load(f)
+    # Les pouvoirs en cours (animaux, feu, peste, tornades) sont rangés à part dans la sauvegarde.
+    d["extras"] = {
+        "animaux": ETAT.get("animaux", []),
+        "feux": [[x, y, t] for (x, y), t in ETAT.get("feux", {}).items()],
+        "peste": sorted(ETAT.get("peste", set())),
+        "tornades": ETAT.get("tornades", []),
+    }
+    return json.dumps(d)
 
 
 def charger_texte(texte):
+    extras = json.loads(texte).get("extras", {})
     with open(CHEMIN_SAUVEGARDE, "w", encoding="utf-8") as f:
         f.write(texte)
     ETAT["sim"] = sauvegarde.charger(CHEMIN_SAUVEGARDE, joueur=None)
     _reinitialiser_fleaux()
+    ETAT["animaux"] = extras.get("animaux", [])
+    ETAT["feux"] = {(x, y): t for x, y, t in extras.get("feux", [])}
+    ETAT["peste"] = set(extras.get("peste", []))
+    ETAT["tornades"] = extras.get("tornades", [])
     BASE["terre"] = set(charger().cases_terre())
     actuelle = set(ETAT["sim"].monde.cases_terre())
     for c in actuelle - BASE["terre"]:
