@@ -121,7 +121,7 @@ function dessinerCarte() {
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s * 0.8), Math.max(1, s * 0.8));
   }
   const enPriere = new Set(etat.prieres.map((p) => p.auteur));
-  for (const [x, y, nom] of etat.villes) {
+  for (const [x, y, nom] of ($("reglage-villes").checked ? etat.villes : [])) {
     const cx = decalage.x + x * s, cy = decalage.y + y * s;
     ctx.fillStyle = "#fef08a";
     ctx.beginPath(); ctx.arc(cx, cy, Math.max(1.5, s * 0.6), 0, 2 * Math.PI); ctx.fill();

@@ -10,7 +10,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Taille du pinceau réglable (petit / moyen / grand)
 - ✅ Panneau d'infos sur une personne : âge, couple, enfants, langue, savoirs, soif, faim, foi
 - ✅ Sauvegardes multiples (trois emplacements)
-- ❌ Menu de réglages (langue, sons, affichage)
+- 🟡 Menu de réglages : seul l'affichage des villes peut être coupé ; langue et sons à faire
 
 ## Terrain
 - ✅ Terre ajoutée sur la mer
