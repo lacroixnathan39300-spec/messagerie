@@ -22,7 +22,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 
 ## Êtres
 - 🟡 Personnes (naissance, mort, faim, soif, prières)
-- 🟡 Animaux (moutons et loups errent, le loup mange le mouton ; sauvegardés ; pas encore de poissons)
+- ✅ Animaux : moutons et loups marchent sur la terre (le loup mange le mouton), poissons nagent dans la mer ; sauvegardés
 - ❌ Créatures spéciales (dragons, zombies…)
 - ❌ Rencontres et combats entre peuples
 

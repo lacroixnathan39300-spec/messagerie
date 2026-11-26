@@ -129,7 +129,7 @@ function dessinerCarte() {
     }
   }
   for (const [x, y, espece] of etat.animaux) {
-    ctx.fillStyle = espece === "loup" ? "#6b7280" : "#f5f5f4";
+    ctx.fillStyle = espece === "loup" ? "#6b7280" : espece === "poisson" ? "#38bdf8" : "#f5f5f4";
     ctx.beginPath(); ctx.arc(decalage.x + x * s, decalage.y + y * s, Math.max(2, s * 1.2), 0, 2 * Math.PI); ctx.fill();
   }
   for (const p of etat.personnes) {

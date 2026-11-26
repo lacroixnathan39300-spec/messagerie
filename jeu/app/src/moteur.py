@@ -88,7 +88,8 @@ def _propager(sim):
     for a in animaux:
         if random.random() < 0.5:
             dx, dy = random.choice(((1, 0), (-1, 0), (0, 1), (0, -1)))
-            if sim.monde.est_terre(a[0] + dx, a[1] + dy):
+            # Les poissons nagent dans la mer, les moutons et loups marchent sur la terre.
+            if sim.monde.est_terre(a[0] + dx, a[1] + dy) == (a[2] != "poisson"):
                 a[0] += dx
                 a[1] += dy
     if any(a[2] == "loup" for a in animaux):
@@ -195,12 +196,13 @@ def agir(outil, i, j, rayon=2):
                 if dx * dx + dy * dy <= rayon * rayon and sim.monde.est_terre(i + dx, j + dy):
                     sim.monde.poser_terre(i + dx, j + dy, False)
         message = f"Une météorite s'écrase : {len(touches)} morts, un cratère s'ouvre."
-    elif outil in ("mouton", "loup"):
-        if sim.monde.est_terre(i, j):
+    elif outil in ("mouton", "loup", "poisson"):
+        terre = sim.monde.est_terre(i, j)
+        if terre == (outil != "poisson"):
             ETAT.setdefault("animaux", []).append([i, j, outil])
-            message = "Un mouton paît." if outil == "mouton" else "Un loup rôde."
+            message = {"mouton": "Un mouton paît.", "loup": "Un loup rôde.", "poisson": "Un banc de poissons passe."}[outil]
         else:
-            message = "C'est la mer."
+            message = "Il faut la terre." if outil != "poisson" else "Il faut la mer."
     elif outil == "montagne":
         posees = 0
         for dx in range(-rayon, rayon + 1):
