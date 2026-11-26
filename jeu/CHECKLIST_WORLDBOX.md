@@ -8,7 +8,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Zoom (boutons et molette)
 - ✅ Pincer pour zoomer sur téléphone
 - ✅ Taille du pinceau réglable (petit / moyen / grand)
-- ❌ Panneau d'infos sur une personne : nom, âge, métier, peuple (aujourd'hui : soif, faim, foi)
+- ✅ Panneau d'infos sur une personne : âge, couple, enfants, langue, savoirs, soif, faim, foi
 - ❌ Sauvegardes multiples et nommées
 - ❌ Menu de réglages (langue, sons, affichage)
 

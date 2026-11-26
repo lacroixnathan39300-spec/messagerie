@@ -282,6 +282,8 @@ function toucher(e) {
     `<h3>Personne n°${meilleure.id}</h3>` +
     `<div>Soif ${meilleure.soif} · Faim ${meilleure.faim} · Foi ${meilleure.foi}` +
     `${meilleure.schismatique ? " · schismatique" : ""}</div>` +
+    `<div>Âge ${meilleure.age} ans · ${meilleure.marie ? "marié(e)" : "célibataire"} · ${meilleure.enfants} enfant(s)</div>` +
+    `<div>Langue : ${meilleure.langue} · Savoirs : ${meilleure.savoirs.length ? meilleure.savoirs.join(", ") : "aucun"}</div>` +
     `<div class="petit">Position : ${meilleure.x}, ${meilleure.y}</div>` +
     `<button id="voir-zone" class="principal" style="margin-top:6px">Voir la zone à 5 m par case</button>`;
   $("voir-zone").onclick = voirZone;

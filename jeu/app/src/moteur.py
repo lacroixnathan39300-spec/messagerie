@@ -263,7 +263,10 @@ def etat():
         "bilan": sim.bilan(),
         "personnes": [
             {"id": p.identifiant, "x": p.x, "y": p.y, "soif": round(p.soif, 1), "faim": round(p.faim, 1),
-             "foi": round(p.foi, 2), "schismatique": p.schismatique}
+             "foi": round(p.foi, 2), "schismatique": p.schismatique,
+             "age": round(p.age / 365, 1), "langue": p.langue or "aucune",
+             "enfants": len(p.enfants), "marie": p.conjoint is not None,
+             "savoirs": sorted(p.savoirs)}
             for p in vivantes
         ],
         "buissons": [[x, y] for (x, y), q in sim.monde.nourriture.items() if q >= 1],
