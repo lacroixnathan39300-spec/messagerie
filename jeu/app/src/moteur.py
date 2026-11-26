@@ -45,6 +45,14 @@ def avancer(tours):
     return etat()
 
 
+def _villes_cases():
+    """Villes du monde réel, converties en cases de la carte (calculé une seule fois)."""
+    if "_villes" not in ETAT:
+        from terre.ressources import case_de, charger_villes
+        ETAT["_villes"] = [[*case_de(v["lat"], v["lon"]), v["nom"]] for v in charger_villes()]
+    return ETAT["_villes"]
+
+
 DUREE_FEU = 6
 PROBA_FEU = 0.3
 PROBA_CONTAGION = 0.15
@@ -247,6 +255,7 @@ def etat():
     eau = sim._eau_active()
     modifs = [[x, y, 1 if v else 0] for (x, y), v in getattr(sim.monde, "modifs", {}).items()]
     animaux = [list(a) for a in ETAT.get("animaux", [])]
+    villes = _villes_cases()
     montagnes = [list(c) for c in getattr(sim.monde, "montagnes", set())]
     return {
         "bilan": sim.bilan(),
@@ -267,6 +276,7 @@ def etat():
         "modifs": modifs,
         "montagnes": montagnes,
         "animaux": animaux,
+        "villes": villes,
     }
 
 

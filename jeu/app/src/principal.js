@@ -119,6 +119,15 @@ function dessinerCarte() {
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s * 0.8), Math.max(1, s * 0.8));
   }
   const enPriere = new Set(etat.prieres.map((p) => p.auteur));
+  for (const [x, y, nom] of etat.villes) {
+    const cx = decalage.x + x * s, cy = decalage.y + y * s;
+    ctx.fillStyle = "#fef08a";
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(1.5, s * 0.6), 0, 2 * Math.PI); ctx.fill();
+    if (zoomCarte >= 4) {
+      ctx.fillStyle = "#e2e8f0"; ctx.font = `${Math.max(10, s * 1.2)}px sans-serif`;
+      ctx.fillText(nom, cx + s, cy - s);
+    }
+  }
   for (const [x, y, espece] of etat.animaux) {
     ctx.fillStyle = espece === "loup" ? "#6b7280" : "#f5f5f4";
     ctx.beginPath(); ctx.arc(decalage.x + x * s, decalage.y + y * s, Math.max(2, s * 1.2), 0, 2 * Math.PI); ctx.fill();

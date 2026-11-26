@@ -28,7 +28,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 
 ## Civilisation
 - 🟡 Peuples, guerres, échanges, schismes (calculés, mais peu visibles sur la carte)
-- ❌ Villages et villes dessinés sur la carte
+- 🟡 Villes du monde réel dessinées sur la carte (243 points, noms en zoom) ; villages et bâtiments créés par les peuples à faire
 - ❌ Bâtiments, routes et véhicules dans la vue zoomée (une partie existe dans la zone 1 km)
 
 ## Pouvoirs et catastrophes
