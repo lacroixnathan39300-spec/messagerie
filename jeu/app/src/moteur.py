@@ -77,6 +77,7 @@ def _reinitialiser_fleaux():
     ETAT["routes"] = []   # [x, y] : cases de route entre villages
     ETAT["vehicules"] = []  # [x, y] : véhicules qui roulent sur les routes
     ETAT["guerres"] = []    # [x1, y1, x2, y2] : peuples en guerre qui se touchent
+    ETAT["laves"] = []      # [x, y] : cases de lave, mortelles
     ETAT["jour_village"] = 0
 
 
@@ -173,6 +174,11 @@ def _propager(sim):
         voisins = [c for c in voisins if c in routes_set]
         if voisins:
             v[0], v[1] = random.choice(voisins)
+
+    laves = {tuple(c) for c in ETAT.get("laves", [])}
+    for p in sim.vivantes():
+        if (p.x, p.y) in laves:
+            sim._mourir(p, "lave")
 
     animaux = ETAT.setdefault("animaux", [])
     for a in animaux:
@@ -293,6 +299,18 @@ def agir(outil, i, j, rayon=2):
             message = {"mouton": "Un mouton paît.", "loup": "Un loup rôde.", "poisson": "Un banc de poissons passe."}[outil]
         else:
             message = "Il faut la terre." if outil != "poisson" else "Il faut la mer."
+    elif outil == "lave":
+        posees = 0
+        laves = ETAT.setdefault("laves", [])
+        deja = {tuple(c) for c in laves}
+        for dx in range(-rayon, rayon + 1):
+            for dy in range(-rayon, rayon + 1):
+                c = (i + dx, j + dy)
+                if dx * dx + dy * dy <= rayon * rayon and sim.monde.est_terre(*c) and c not in deja:
+                    laves.append([c[0], c[1]])
+                    deja.add(c)
+                    posees += 1
+        message = f"La lave jaillit ({posees} cases)." if posees else "Il faut de la terre pour la lave."
     elif outil == "montagne":
         posees = 0
         for dx in range(-rayon, rayon + 1):
@@ -375,6 +393,7 @@ def etat():
         "routes": [list(r) for r in ETAT.get("routes", [])],
         "vehicules": [list(v) for v in ETAT.get("vehicules", [])],
         "guerres": [list(g) for g in ETAT.get("guerres", [])],
+        "laves": [list(c) for c in ETAT.get("laves", [])],
         "largeur": sim.monde.largeur,
         "hauteur": sim.monde.hauteur,
         "terre": [list(c) for c in sim.monde.cases_terre()] if ETAT.get("carte", "terre") != "terre" else None,
@@ -413,6 +432,7 @@ def sauver():
         "villages": ETAT.get("villages", []),
         "routes": ETAT.get("routes", []),
         "vehicules": ETAT.get("vehicules", []),
+        "laves": ETAT.get("laves", []),
     }
     return json.dumps(d)
 
@@ -430,6 +450,7 @@ def charger_texte(texte):
     ETAT["villages"] = extras.get("villages", [])
     ETAT["routes"] = extras.get("routes", [])
     ETAT["vehicules"] = extras.get("vehicules", [])
+    ETAT["laves"] = extras.get("laves", [])
     actuelle = set(ETAT["sim"].monde.cases_terre())
     if ETAT["sim"].monde.largeur == 720:
         ETAT["carte"] = "terre"

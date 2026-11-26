@@ -159,6 +159,10 @@ function dessinerCarte() {
     ctx.beginPath(); ctx.moveTo(decalage.x + x1 * s, decalage.y + y1 * s); ctx.lineTo(decalage.x + x2 * s, decalage.y + y2 * s); ctx.stroke();
   }
   ctx.setLineDash([]);
+  ctx.fillStyle = "#ea580c";
+  for (const [x, y] of etat.laves) {
+    ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s), Math.max(1, s));
+  }
   const POSITIONS_MAISONS = [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, 2], [-2, 2], [2, -2]];
   for (const [x, y, maisons] of etat.villages) {
     const cx = decalage.x + x * s, cy = decalage.y + y * s, taille = Math.max(3, s * 2);

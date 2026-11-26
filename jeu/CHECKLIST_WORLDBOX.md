@@ -18,7 +18,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Montagnes (pinceau, visibles et sauvegardées ; l'effet sur la vie n'est pas encore simulé)
 - 🟡 Forêts : zones denses de buissons teintées en vert foncé
 - ✅ Neige sur les plus hauts sommets de la Terre réelle (altitude)
-- ❌ Lave et désert comme types de sol distincts
+- 🟡 Lave : pinceau qui pose des cases mortelles (elles ne refroidissent pas encore) ; désert à faire
 - ❌ Rivières et lacs
 - ❌ Affichage net de la terre ajoutée à petit zoom
 
