@@ -16,7 +16,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Terre ajoutée sur la mer
 - ✅ Mer qui submerge la terre (noie les personnes)
 - ✅ Montagnes (pinceau, visibles et sauvegardées ; l'effet sur la vie n'est pas encore simulé)
-- ❌ Plages, forêts, neige, lave, désert comme types de sol distincts
+- 🟡 Forêts : zones denses de buissons teintées en vert foncé ; plages, neige, lave, désert à faire
 - ❌ Rivières et lacs
 - ❌ Affichage net de la terre ajoutée à petit zoom
 

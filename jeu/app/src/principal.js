@@ -116,6 +116,14 @@ function dessinerCarte() {
     ctx.fillStyle = terre ? "rgb(120,160,80)" : "rgb(150,190,220)";
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.ceil(s), Math.ceil(s));
   }
+  // Forêt : les endroits où les buissons sont serrés (au moins 4 buissons dans un rayon de 2 cases).
+  const buissons = new Set(etat.buissons.map(([x, y]) => x + "," + y));
+  ctx.fillStyle = "rgba(20,70,30,0.55)";
+  for (const [x, y] of etat.buissons) {
+    let voisins = 0;
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) if (buissons.has((x + dx) + "," + (y + dy))) voisins++;
+    if (voisins >= 5) ctx.fillRect(decalage.x + (x - 2) * s, decalage.y + (y - 2) * s, 5 * s, 5 * s);
+  }
   ctx.fillStyle = "#3d8b37";
   for (const [x, y] of etat.buissons) {
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s * 0.8), Math.max(1, s * 0.8));
