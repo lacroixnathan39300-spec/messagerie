@@ -37,7 +37,9 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Foudre (tue dans un petit rayon)
 - ✅ Pluie (fait repousser les buissons ; neige et sécheresse à faire)
 - ✅ Feu (se propage chaque jour sur la terre et brûle les buissons)
-- 🟡 Tremblement de terre (effet immédiat ; tornade et météorite à faire)
+- 🟡 Tremblement de terre (effet immédiat ; ne s'étend pas encore)
+- ✅ Tornade (se déplace chaque jour et tue ce qu'elle traverse)
+- ✅ Météorite (tue dans une zone large et creuse un cratère de mer)
 - ✅ Peste (se transmet entre voisins et tue chaque jour une partie des malades)
 - ❌ Bombes et armes
 

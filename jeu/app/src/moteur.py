@@ -3,6 +3,7 @@
 L'interface appelle ces fonctions et reçoit des données simples (dictionnaires, listes, texte).
 """
 import json
+import math
 import random
 
 from terre import economie, histoire, sauvegarde, zoom
@@ -53,6 +54,7 @@ PROBA_MORT_PESTE = 0.02
 def _reinitialiser_fleaux():
     ETAT["feux"] = {}      # case (x, y) -> jours restants de feu
     ETAT["peste"] = set()  # identifiants des personnes malades
+    ETAT["tornades"] = []  # [x, y, dx, dy, jours restants]
 
 
 def _propager(sim):
@@ -72,6 +74,16 @@ def _propager(sim):
             v = (x + dx, y + dy)
             if v not in feux and sim.monde.est_terre(*v) and random.random() < PROBA_FEU:
                 feux[v] = DUREE_FEU
+
+    tornades = ETAT.setdefault("tornades", [])
+    for t in tornades:
+        t[0] += t[2]
+        t[1] += t[3]
+        t[4] -= 1
+        for p in sim.vivantes():
+            if abs(p.x - t[0]) <= 1 and abs(p.y - t[1]) <= 1:
+                sim._mourir(p, "tornade")
+    tornades[:] = [t for t in tornades if t[4] > 0]
 
     malades = ETAT.setdefault("peste", set())
     vivantes = {p.identifiant: p for p in sim.vivantes()}
@@ -145,6 +157,21 @@ def agir(outil, i, j, rayon=2):
         for p in touches[::3]:
             malades.add(p.identifiant)
         message = f"La peste frappe : {len(touches[::3])} malades, elle se transmet."
+    elif outil == "tornade":
+        angle = random.random() * 6.283
+        dx, dy = round(math.cos(angle)), round(math.sin(angle))
+        ETAT.setdefault("tornades", []).append([i, j, dx, dy, 15])
+        message = "Une tornade se forme et part en tournoyant."
+    elif outil == "meteorite":
+        touches = [p for p in sim.vivantes()
+                   if abs(p.x - i) <= rayon * 2 and abs(p.y - j) <= rayon * 2]
+        for p in touches:
+            sim._mourir(p, "météorite")
+        for dx in range(-rayon, rayon + 1):
+            for dy in range(-rayon, rayon + 1):
+                if dx * dx + dy * dy <= rayon * rayon and sim.monde.est_terre(i + dx, j + dy):
+                    sim.monde.poser_terre(i + dx, j + dy, False)
+        message = f"Une météorite s'écrase : {len(touches)} morts, un cratère s'ouvre."
     elif outil == "montagne":
         posees = 0
         for dx in range(-rayon, rayon + 1):
