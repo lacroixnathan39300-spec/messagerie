@@ -9,7 +9,7 @@ import random
 from terre import economie, histoire, sauvegarde, zoom
 from terre.personne import Personne
 from terre.priere import TEXTES
-from terre.monde import NOURRITURE_MAX
+from terre.monde import NOURRITURE_MAX, creer_ile
 from terre.ressources import charger_population
 from terre.simulation import Simulation
 from terre.terre_reelle import charger, semer_buissons
@@ -19,12 +19,21 @@ NB_PERSONNES_DEPART = 30
 CHEMIN_SAUVEGARDE = "/partie.json"
 
 
-def nouvelle_partie(graine=1):
-    monde = charger()
+def nouvelle_partie(graine=1, carte="terre"):
     rng = random.Random(graine)
+    if carte == "ile":
+        monde = creer_ile(graine)
+        monde.points_eau = {c for c in monde.cases_terre()
+                            if any(not monde.est_terre(c[0] + dx, c[1] + dy)
+                                   for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))}
+        BASE["terre"] = None  # pas de carte de référence : tout est d'origine
+        ETAT["carte"] = "ile"
+    else:
+        monde = charger()
+        BASE["terre"] = set(monde.cases_terre())
+        ETAT["carte"] = "terre"
     cotes = sorted(monde.points_eau)
     personnes = [Personne(i, *rng.choice(cotes)) for i in range(NB_PERSONNES_DEPART)]
-    BASE["terre"] = set(monde.cases_terre())
     ETAT["sim"] = Simulation(monde, personnes, graine)
     _reinitialiser_fleaux()
     ETAT["population"] = charger_population()
@@ -257,7 +266,7 @@ def etat():
     eau = sim._eau_active()
     modifs = [[x, y, 1 if v else 0] for (x, y), v in getattr(sim.monde, "modifs", {}).items()]
     animaux = [list(a) for a in ETAT.get("animaux", [])]
-    villes = _villes_cases()
+    villes = _villes_cases() if ETAT.get("carte") != "ile" else []
     montagnes = [list(c) for c in getattr(sim.monde, "montagnes", set())]
     return {
         "bilan": sim.bilan(),
@@ -281,6 +290,9 @@ def etat():
         "modifs": modifs,
         "montagnes": montagnes,
         "animaux": animaux,
+        "largeur": sim.monde.largeur,
+        "hauteur": sim.monde.hauteur,
+        "terre": [list(c) for c in sim.monde.cases_terre()] if ETAT.get("carte") == "ile" else None,
         "villes": villes,
     }
 
@@ -327,11 +339,16 @@ def charger_texte(texte):
     ETAT["feux"] = {(x, y): t for x, y, t in extras.get("feux", [])}
     ETAT["peste"] = set(extras.get("peste", []))
     ETAT["tornades"] = extras.get("tornades", [])
-    BASE["terre"] = set(charger().cases_terre())
     actuelle = set(ETAT["sim"].monde.cases_terre())
-    for c in actuelle - BASE["terre"]:
-        ETAT["sim"].monde.modifs[c] = True
-    for c in BASE["terre"] - actuelle:
-        ETAT["sim"].monde.modifs[c] = False
+    if ETAT["sim"].monde.largeur == 720:
+        ETAT["carte"] = "terre"
+        BASE["terre"] = set(charger().cases_terre())
+        for c in actuelle - BASE["terre"]:
+            ETAT["sim"].monde.modifs[c] = True
+        for c in BASE["terre"] - actuelle:
+            ETAT["sim"].monde.modifs[c] = False
+    else:
+        ETAT["carte"] = "ile"
+        BASE["terre"] = None
     ETAT["population"] = charger_population()
     return etat()

@@ -4,7 +4,7 @@ import { loadPyodide } from "./pyodide/pyodide.mjs";
 const $ = (id) => document.getElementById(id);
 const CLE_BASE = "terre-vivante-partie";
 const cle = () => CLE_BASE + "-" + $("emplacement").value;
-const LARGEUR_TERRE = 720, HAUTEUR_TERRE = 360;
+let LARGEUR_TERRE = 720, HAUTEUR_TERRE = 360;
 const COULEURS_ALTITUDE = [
   [120,170,90],[135,180,95],[160,185,100],[185,185,110],[195,175,115],
   [180,150,105],[160,130,95],[140,115,95],[200,195,190],[250,250,250]];
@@ -14,7 +14,7 @@ const COULEURS_ZONE = {
 const MER = [150, 190, 220];
 
 let py, etat = null, enCours = true, zoomCarte = 1, decalage = { x: 0, y: 0 };
-let fondTerre = null, dernierClic = null;
+let fondTerre = null, dernierClic = null, fondIle = null;
 
 function appeler(expression) {
   return JSON.parse(py.runPython(`import json, moteur\njson.dumps(${expression})`));
@@ -80,6 +80,7 @@ function ajusterCarte() {
   canvas.style.height = hauteur + "px";
   canvas.width = largeur * devicePixelRatio;
   canvas.height = hauteur * devicePixelRatio;
+  LARGEUR_TERRE = etat.largeur || 720; HAUTEUR_TERRE = etat.hauteur || 360;
   zoomCarte = canvas.width / LARGEUR_TERRE;
   decalage = { x: 0, y: (canvas.height - HAUTEUR_TERRE * zoomCarte) / 2 };
 }
@@ -106,7 +107,7 @@ function dessinerCarte() {
   ctx.fillStyle = "#0b1220";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(fondTerre, decalage.x, decalage.y, LARGEUR_TERRE * s, HAUTEUR_TERRE * s);
+  ctx.drawImage(fondCourant(), decalage.x, decalage.y, LARGEUR_TERRE * s, HAUTEUR_TERRE * s);
   for (const [x, y] of etat.montagnes) {
     ctx.fillStyle = "rgb(120,110,100)";
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.ceil(s), Math.ceil(s));
@@ -180,6 +181,21 @@ function afficherChronique() {
     `<div class="ligne">Tour ${e.tour} : ${e.texte}</div>`).join("");
 }
 
+function fondCourant() {
+  if (!etat.terre) return fondTerre;
+  const cle = `${etat.largeur}x${etat.hauteur}:${etat.terre.length}:${etat.terre[0]}`;
+  if (!fondIle || fondIle.cle !== cle) {
+    const c = document.createElement("canvas");
+    c.width = etat.largeur; c.height = etat.hauteur;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "rgb(150,190,220)"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = "rgb(110,150,70)";
+    for (const [x, y] of etat.terre) ctx.fillRect(x, y, 1, 1);
+    fondIle = { cle, canvas: c };
+  }
+  return fondIle.canvas;
+}
+
 let delaiMessage = null;
 function message(texte) {
   $("message").textContent = texte;
@@ -227,7 +243,8 @@ function lier() {
   };
   $("nouvelle").onclick = () => {
     const graine = Math.max(1, parseInt($("graine").value || "1", 10));
-    etat = appeler(`moteur.nouvelle_partie(${graine})`);
+    etat = appeler(`moteur.nouvelle_partie(${graine}, '${$("carte-type").value}')`);
+    ajusterCarte();
     rendre();
   };
   $("fermer-zone").onclick = () => { $("zone-wrap").style.display = "none"; };

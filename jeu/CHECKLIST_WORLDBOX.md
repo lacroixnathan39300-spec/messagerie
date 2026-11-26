@@ -45,7 +45,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 
 ## Monde
 - ✅ Carte réelle de la Terre (1 case = environ 55 km)
-- ❌ Changer de carte (générer une nouvelle carte ou une île)
+- 🟡 Changer de carte : île générée (menu « Nouvelle partie ») ; carte aléatoire à faire
 - ❌ Partager une carte avec d'autres joueurs
 
 ## Technique
