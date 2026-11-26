@@ -64,7 +64,15 @@ function construireFond(texte) {
   for (let j = 0; j < HAUTEUR_TERRE; j++) {
     for (let i = 0; i < LARGEUR_TERRE; i++) {
       const car = lignes[j][i];
-      const [r, g, b] = car === "." ? MER : COULEURS_ALTITUDE[Number(car)];
+      let [r, g, b] = car === "." ? MER : COULEURS_ALTITUDE[Number(car)];
+      // Plage : terre basse (altitude 0 ou 1) qui touche la mer.
+      if (car !== "." && Number(car) <= 1) {
+        const cotiere = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
+          const ligne = lignes[j + dy];
+          return ligne !== undefined && ligne[i + dx] === ".";
+        });
+        if (cotiere) [r, g, b] = [214, 196, 142];
+      }
       const k = (j * LARGEUR_TERRE + i) * 4;
       img.data[k] = r; img.data[k + 1] = g; img.data[k + 2] = b; img.data[k + 3] = 255;
     }
@@ -209,6 +217,12 @@ function fondCourant() {
     ctx.fillStyle = "rgb(150,190,220)"; ctx.fillRect(0, 0, c.width, c.height);
     ctx.fillStyle = "rgb(110,150,70)";
     for (const [x, y] of etat.terre) ctx.fillRect(x, y, 1, 1);
+    // Plages : les cases de terre qui touchent la mer.
+    const terre = new Set(etat.terre.map(([x, y]) => x + "," + y));
+    ctx.fillStyle = "rgb(214,196,142)";
+    for (const [x, y] of etat.terre) {
+      if (![[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dy]) => terre.has((x + dx) + "," + (y + dy)))) ctx.fillRect(x, y, 1, 1);
+    }
     fondIle = { cle, canvas: c };
   }
   return fondIle.canvas;
