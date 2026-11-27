@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application")
+    id("com.chaquo.python")
 }
 
 android {
@@ -25,6 +26,11 @@ android {
     }
 }
 
+chaquopy {
+    defaultConfig {
+        version = "3.12"
+    }
+}
+
 dependencies {
-    implementation("androidx.webkit:webkit:1.12.1")
 }

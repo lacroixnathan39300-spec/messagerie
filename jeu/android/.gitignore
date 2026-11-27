@@ -1,3 +1,6 @@
 app/src/main/assets/jeu/
 app/build/
 .gradle/
+__pycache__/
+app/src/main/python/terre/
+app/src/main/python/moteur.py

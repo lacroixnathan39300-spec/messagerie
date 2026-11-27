@@ -1,8 +1,8 @@
 pluginManagement {
-    repositories { google(); mavenCentral(); gradlePluginPortal() }
+    repositories { google(); mavenCentral(); gradlePluginPortal(); maven { url = uri("https://chaquo.com/maven") } }
 }
 dependencyResolutionManagement {
-    repositories { google(); mavenCentral() }
+    repositories { google(); mavenCentral(); maven { url = uri("https://chaquo.com/maven") } }
 }
 rootProject.name = "TerreVivante"
 include(":app")
