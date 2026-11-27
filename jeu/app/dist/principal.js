@@ -209,6 +209,7 @@ function dessinerCarte() {
     if (zoomCarte >= SEUIL_SPRITES) { dessinerSprite(ctx, espece, x, y, s); continue; }
     ctx.fillStyle = {loup: "#6b7280", poisson: "#38bdf8", dragon: "#dc2626", zombie: "#65a30d"}[espece] || "#f5f5f4";
     ctx.beginPath(); ctx.arc(decalage.x + x * s, decalage.y + y * s, Math.max(2, s * 1.2), 0, 2 * Math.PI); ctx.fill();
+    ctx.strokeStyle = "#111827"; ctx.lineWidth = 1; ctx.stroke();   // contour sombre : lisible sur toutes les couleurs
   }
   for (const p of etat.personnes) {
     const cx = decalage.x + p.x * s, cy = decalage.y + p.y * s;
@@ -220,6 +221,7 @@ function dessinerCarte() {
     if (zoomCarte >= SEUIL_SPRITES) { dessinerSprite(ctx, "humain", p.x, p.y, s, couleur); continue; }
     ctx.fillStyle = couleur;
     ctx.beginPath(); ctx.arc(cx, cy, Math.max(2.5, s * 1.5), 0, 2 * Math.PI); ctx.fill();
+    ctx.strokeStyle = "#111827"; ctx.lineWidth = 1; ctx.stroke();
   }
   // Cercle du pinceau, au survol du curseur ou sous le doigt.
   if (survol && $("outil").value !== "voir") {
