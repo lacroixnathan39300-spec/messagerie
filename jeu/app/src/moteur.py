@@ -36,8 +36,24 @@ def nouvelle_partie(graine=1, carte="terre"):
     personnes = [Personne(i, *rng.choice(cotes)) for i in range(NB_PERSONNES_DEPART)]
     ETAT["sim"] = Simulation(monde, personnes, graine)
     _reinitialiser_fleaux()
+    if ETAT["carte"] == "terre":
+        ETAT["deserts"] = _deserts_naturels(monde)
     ETAT["population"] = charger_population()
     return etat()
+
+
+def _deserts_naturels(monde):
+    """Déserts approximatifs : plaines intérieures des zones subtropicales (18 à 32° de latitude).
+    Pas de données climatiques : on se fonde sur la latitude, l'altitude et l'éloignement de la mer."""
+    res = []
+    for (x, y) in monde.cases_terre():
+        lat = 90 - (y + 0.5) * 0.5
+        if not 18 <= abs(lat) <= 32 or monde.altitude.get((x, y), 0) > 4:
+            continue
+        if all(monde.est_terre(x + dx, y + dy) for dx in range(-2, 3) for dy in range(-2, 3)):
+            res.append([x, y])
+            monde.nourriture.pop((x, y), None)
+    return res
 
 
 def _sim():

@@ -20,6 +20,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Neige sur les plus hauts sommets de la Terre réelle (altitude)
 - ✅ Lave : pinceau qui pose des cases mortelles, qui refroidissent après 40 jours
 - ✅ Désert : pinceau qui retire les buissons (aucun n'y pousse)
+- 🟡 Désert naturel : déserts placés approximativement dans les zones subtropicales (sans données climatiques)
 - ❌ Rivières et lacs
 - ❌ Affichage net de la terre ajoutée à petit zoom
 
