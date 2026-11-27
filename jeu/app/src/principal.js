@@ -163,6 +163,10 @@ function dessinerCarte() {
   for (const [x, y] of etat.laves) {
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s), Math.max(1, s));
   }
+  ctx.fillStyle = "rgb(222,184,110)";
+  for (const [x, y] of etat.deserts) {
+    ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s), Math.max(1, s));
+  }
   const POSITIONS_MAISONS = [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, 2], [-2, 2], [2, -2]];
   for (const [x, y, maisons] of etat.villages) {
     const cx = decalage.x + x * s, cy = decalage.y + y * s, taille = Math.max(3, s * 2);

@@ -78,6 +78,7 @@ def _reinitialiser_fleaux():
     ETAT["vehicules"] = []  # [x, y] : véhicules qui roulent sur les routes
     ETAT["guerres"] = []    # [x1, y1, x2, y2] : peuples en guerre qui se touchent
     ETAT["laves"] = []      # [x, y] : cases de lave, mortelles
+    ETAT["deserts"] = []    # [x, y] : cases de désert, sans buissons
     ETAT["jour_village"] = 0
 
 
@@ -311,6 +312,20 @@ def agir(outil, i, j, rayon=2):
                     deja.add(c)
                     posees += 1
         message = f"La lave jaillit ({posees} cases)." if posees else "Il faut de la terre pour la lave."
+    elif outil == "desert":
+        posees = 0
+        deserts = ETAT.setdefault("deserts", [])
+        deja = {tuple(c) for c in deserts}
+        for dx in range(-rayon, rayon + 1):
+            for dy in range(-rayon, rayon + 1):
+                c = (i + dx, j + dy)
+                if dx * dx + dy * dy <= rayon * rayon and sim.monde.est_terre(*c):
+                    sim.monde.nourriture.pop(c, None)
+                    if c not in deja:
+                        deserts.append([c[0], c[1]])
+                        deja.add(c)
+                        posees += 1
+        message = f"Le désert s'étend ({posees} cases) : plus aucun buisson n'y pousse." if posees else "Il faut de la terre pour le désert."
     elif outil == "montagne":
         posees = 0
         for dx in range(-rayon, rayon + 1):
@@ -394,6 +409,7 @@ def etat():
         "vehicules": [list(v) for v in ETAT.get("vehicules", [])],
         "guerres": [list(g) for g in ETAT.get("guerres", [])],
         "laves": [list(c) for c in ETAT.get("laves", [])],
+        "deserts": [list(c) for c in ETAT.get("deserts", [])],
         "largeur": sim.monde.largeur,
         "hauteur": sim.monde.hauteur,
         "terre": [list(c) for c in sim.monde.cases_terre()] if ETAT.get("carte", "terre") != "terre" else None,
@@ -433,6 +449,7 @@ def sauver():
         "routes": ETAT.get("routes", []),
         "vehicules": ETAT.get("vehicules", []),
         "laves": ETAT.get("laves", []),
+        "deserts": ETAT.get("deserts", []),
     }
     return json.dumps(d)
 
@@ -451,6 +468,7 @@ def charger_texte(texte):
     ETAT["routes"] = extras.get("routes", [])
     ETAT["vehicules"] = extras.get("vehicules", [])
     ETAT["laves"] = extras.get("laves", [])
+    ETAT["deserts"] = extras.get("deserts", [])
     actuelle = set(ETAT["sim"].monde.cases_terre())
     if ETAT["sim"].monde.largeur == 720:
         ETAT["carte"] = "terre"
