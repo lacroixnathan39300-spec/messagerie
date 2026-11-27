@@ -50,6 +50,8 @@ async function demarrer() {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
   window.addEventListener("resize", () => { ajusterCarte(); rendre(); });
+  // Le canevas suit la taille réelle de sa zone, même si la barre du haut change de hauteur.
+  new ResizeObserver(() => { ajusterCarte(); rendre(); }).observe($("carte-wrap"));
   setTimeout(() => { ajusterCarte(); rendre(); }, 500);
   setInterval(() => { if (enCours) avancer(); }, 1000);  // 1 seconde = 1 tour (1 jour) à la vitesse ×1
   setInterval(() => { localStorage.setItem(cle(), py.runPython("moteur.sauver()")); }, 30000);
@@ -84,6 +86,7 @@ function construireFond(texte) {
 function ajusterCarte() {
   const canvas = $("carte");
   const largeur = $("carte-wrap").clientWidth, hauteur = $("carte-wrap").clientHeight;
+  if (!etat || !largeur || !hauteur) return;   // mise en page pas encore calculée : on attend
   canvas.style.width = largeur + "px";
   canvas.style.height = hauteur + "px";
   canvas.width = largeur * devicePixelRatio;
@@ -377,8 +380,10 @@ function lier() {
     };
   }
   $("lecture").onclick = () => { enCours = !enCours; rendre(); };
-  $("zoom+").onclick = () => { zoomCarte *= 1.4; rendre(); };
-  $("zoom-").onclick = () => { zoomCarte = Math.max(0.5, zoomCarte / 1.4); rendre(); };
+  // Les boutons zooment autour du centre de l'écran.
+  const centreEcran = () => ({ x: $("carte").width / 2, y: $("carte").height / 2 });
+  $("zoom+").onclick = () => { const c = centreEcran(); zoomAutour(1.4, c.x, c.y); };
+  $("zoom-").onclick = () => { const c = centreEcran(); zoomAutour(1 / 1.4, c.x, c.y); };
   $("sauver").onclick = () => { localStorage.setItem(cle(), py.runPython("moteur.sauver()")); message("Partie sauvegardée sur ce téléphone."); };
   $("charger").onclick = () => {
     const sauve = localStorage.getItem(cle());
@@ -397,36 +402,67 @@ function lier() {
 
   const carte = $("carte");
   let glisse = null;
-  carte.addEventListener("pointerdown", (e) => { glisse = { x: e.clientX, y: e.clientY, dx: decalage.x, dy: decalage.y, moved: false }; });
+  carte.addEventListener("pointerdown", (e) => {
+    if (doigts.size >= 1) { glisse = null; return; }   // pas de glisser ni de toucher pendant un pincement
+    glisse = { x: e.clientX, y: e.clientY, dx: decalage.x, dy: decalage.y, moved: false };
+  });
   carte.addEventListener("pointermove", (e) => {
-    if (!glisse) return;
+    if (!glisse || doigts.size > 1) return;
     const dx = (e.clientX - glisse.x) * devicePixelRatio, dy = (e.clientY - glisse.y) * devicePixelRatio;
     if (Math.abs(dx) + Math.abs(dy) > 4) glisse.moved = true;
     decalage = { x: glisse.dx + dx, y: glisse.dy + dy };
     dessinerCarte();
   });
   carte.addEventListener("pointerup", (e) => {
-    if (glisse && !glisse.moved) toucher(e);
+    if (glisse && !glisse.moved && doigts.size <= 1) toucher(e);
     glisse = null;
   });
   carte.style.touchAction = "none";
+  // Pincement à deux doigts : on suit les doigts pour zoomer autour de leur milieu.
+  const doigts = new Map();
   let pincement = null;
-  carte.addEventListener("touchstart", (e) => {
-    if (e.touches.length === 2) pincement = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-  }, { passive: true });
-  carte.addEventListener("touchmove", (e) => {
-    if (e.touches.length !== 2 || !pincement) return;
-    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-    zoomCarte = Math.min(40, Math.max(0.5, zoomCarte * d / pincement));
-    pincement = d;
-    dessinerCarte();
-  }, { passive: true });
-  carte.addEventListener("touchend", () => { pincement = null; }, { passive: true });
+  const milieuEtDistance = () => {
+    const [a, b] = [...doigts.values()];
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) };
+  };
+  carte.addEventListener("pointerdown", (e) => {
+    doigts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (doigts.size === 2) pincement = milieuEtDistance();
+  });
+  carte.addEventListener("pointermove", (e) => {
+    if (!doigts.has(e.pointerId)) return;
+    doigts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (doigts.size === 2 && pincement) {
+      const m = milieuEtDistance();
+      const rect = carte.getBoundingClientRect();
+      zoomAutour(m.d / pincement.d, (m.x - rect.left) * devicePixelRatio, (m.y - rect.top) * devicePixelRatio);
+      decalage.x += (m.x - pincement.x) * devicePixelRatio;
+      decalage.y += (m.y - pincement.y) * devicePixelRatio;
+      pincement = m;
+      dessinerCarte();
+    }
+  });
+  const relacher = (e) => {
+    doigts.delete(e.pointerId);
+    if (doigts.size < 2) pincement = null;
+  };
+  carte.addEventListener("pointerup", relacher);
+  carte.addEventListener("pointercancel", relacher);
   carte.addEventListener("wheel", (e) => {
     e.preventDefault();
-    zoomCarte = Math.min(40, Math.max(0.5, zoomCarte * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+    const rect = carte.getBoundingClientRect();
+    zoomAutour(e.deltaY < 0 ? 1.15 : 1 / 1.15, (e.clientX - rect.left) * devicePixelRatio, (e.clientY - rect.top) * devicePixelRatio);
     dessinerCarte();
   }, { passive: false });
+}
+
+// Zoom autour d'un point de l'écran (en pixels du canevas) : ce point reste sous le doigt ou le curseur.
+function zoomAutour(facteur, x, y) {
+  const nouveau = Math.min(40, Math.max(0.5, zoomCarte * facteur));
+  const k = nouveau / zoomCarte;
+  decalage = { x: x - (x - decalage.x) * k, y: y - (y - decalage.y) * k };
+  zoomCarte = nouveau;
+  rendre();
 }
 
 function toucher(e) {
