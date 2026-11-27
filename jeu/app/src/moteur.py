@@ -477,6 +477,12 @@ def decider(identifiant_priere, choix):
 def etat():
     sim = _sim()
     vivantes = sim.vivantes()
+    # Chaque personne porte le numéro de son peuple (ou -1), pour la colorier sur la carte.
+    from terre.peuples import peuples as _peuples
+    numero_peuple = {}
+    for k, pe in enumerate(_peuples(sim._groupes())):
+        for membre in pe.membres:
+            numero_peuple[id(membre)] = k
     prieres = [
         {"id": pr.identifiant, "auteur": pr.auteur, "besoin": pr.besoin, "texte": TEXTES[pr.besoin]}
         for pr in sim.prieres_en_attente()
@@ -490,7 +496,7 @@ def etat():
         "bilan": sim.bilan(),
         "personnes": [
             {"id": p.identifiant, "x": p.x, "y": p.y, "soif": round(p.soif, 1), "faim": round(p.faim, 1),
-             "foi": round(p.foi, 2), "schismatique": p.schismatique,
+             "foi": round(p.foi, 2), "schismatique": p.schismatique, "peuple": numero_peuple.get(id(p), -1),
              "age": round(p.age / 365, 1), "langue": p.langue or "aucune",
              "enfants": len(p.enfants), "marie": p.conjoint is not None,
              "savoirs": sorted(p.savoirs)}

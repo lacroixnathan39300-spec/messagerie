@@ -208,8 +208,9 @@ function dessinerCarte() {
       ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(cx, cy, Math.max(4, s * 2.5), 0, 2 * Math.PI); ctx.stroke();
     }
-    if (zoomCarte >= SEUIL_SPRITES) { dessinerSprite(ctx, "humain", p.x, p.y, s, p.schismatique ? "#b91c1c" : "#1d4ed8"); continue; }
-    ctx.fillStyle = p.schismatique ? "#b91c1c" : "#1d4ed8";
+    const couleur = couleurPersonne(p);
+    if (zoomCarte >= SEUIL_SPRITES) { dessinerSprite(ctx, "humain", p.x, p.y, s, couleur); continue; }
+    ctx.fillStyle = couleur;
     ctx.beginPath(); ctx.arc(cx, cy, Math.max(2.5, s * 1.5), 0, 2 * Math.PI); ctx.fill();
   }
 }
@@ -217,6 +218,12 @@ function dessinerCarte() {
 // Petits personnages en pixels, dessinés quand on zoome assez pour qu'un pixel reste visible.
 // Une grille de 8 x 8 par espèce ; un personnage fait environ une case de large.
 const SEUIL_SPRITES = 8;
+// Chaque peuple a sa couleur ; les schismatiques sont en rouge, les personnes sans peuple en gris.
+const COULEURS_PEUPLES = ["#2563eb", "#16a34a", "#ca8a04", "#9333ea", "#0891b2", "#db2777", "#65a30d", "#ea580c"];
+function couleurPersonne(p) {
+  if (p.schismatique) return "#b91c1c";
+  return p.peuple >= 0 ? COULEURS_PEUPLES[p.peuple % COULEURS_PEUPLES.length] : "#64748b";
+}
 // Lettres : b = corps, c = peau, w = blanc, g = gris ou vert, r = rouge, k = contour sombre, y = jaune.
 const PALETTES = {
   humain: { b: "#1d4ed8", c: "#fcd9b6", k: "#1c1917" },

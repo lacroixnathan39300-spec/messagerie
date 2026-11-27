@@ -32,7 +32,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - 🟡 Rencontres entre peuples : une ligne rouge relie deux peuples en guerre et proches (code testé, guerre pas encore observée)
 
 ## Civilisation
-- 🟡 Peuples, guerres, échanges, schismes (calculés, mais peu visibles sur la carte)
+- 🟡 Peuples, guerres, échanges, schismes : chaque peuple a sa couleur sur la carte et les schismatiques sont en rouge ; guerres et échanges calculés mais rarement observés
 - ✅ Villes du monde réel (243 points, noms en zoom) et villages fondés par les peuples (marqueurs)
 - 🟡 Bâtiments : les villages grandissent d'une maison tous les 30 jours (jusqu'à 8), dessinés en maisons à petit détail quand on zoome
 - ✅ Routes : deux villages proches et peuplés sont reliés par une route sur la terre
