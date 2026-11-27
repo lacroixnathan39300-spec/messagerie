@@ -129,6 +129,7 @@ def _reinitialiser_fleaux():
     ETAT["deserts"] = []    # [x, y] : cases de désert, sans buissons
     ETAT["rivieres"] = []   # [x, y] : cases d'eau courante, qui descendent des montagnes vers la mer
     ETAT["lacs"] = []       # [x, y] : cases d'eau stagnante, là où une rivière ne peut plus descendre
+    ETAT["secousses"] = []  # [x, y, rayon, jours] : répliques d'un séisme
     ETAT["jour_village"] = 0
 
 
@@ -274,6 +275,18 @@ def _propager(sim):
             for p in sim.vivantes():
                 if abs(p.x - a[0]) <= 1 and abs(p.y - a[1]) <= 1 and random.random() < 0.3:
                     sim._mourir(p, "zombie")
+    # Les répliques : pendant quelques jours, de petites secousses tuent les personnes proches de l'épicentre.
+    secousses = ETAT.setdefault("secousses", [])
+    for sec in secousses:
+        if random.random() < 0.3:
+            # Une réplique frappe un point au hasard dans la zone de l'épicentre.
+            px = sec[0] + random.randint(-sec[2] * 2, sec[2] * 2)
+            py = sec[1] + random.randint(-sec[2] * 2, sec[2] * 2)
+            for p in sim.vivantes():
+                if abs(p.x - px) <= 1 and abs(p.y - py) <= 1 and random.random() < 0.5:
+                    sim._mourir(p, "séisme")
+        sec[3] -= 1
+    secousses[:] = [sec for sec in secousses if sec[3] > 0]
     tornades = ETAT.setdefault("tornades", [])
     for t in tornades:
         t[0] += t[2]
@@ -347,6 +360,7 @@ def agir(outil, i, j, rayon=2):
         for dx in range(-rayon_seisme, rayon_seisme + 1):
             for dy in range(-rayon_seisme, rayon_seisme + 1):
                 sim.monde.nourriture.pop((i + dx, j + dy), None)
+        ETAT.setdefault("secousses", []).append([i, j, rayon_seisme, 4])  # répliques pendant 4 jours
         message = f"Un tremblement de terre frappe : {len(touches)} morts."
     elif outil == "peste":
         # Une personne sur trois dans la zone meurt de la peste (effet immédiat).
@@ -545,6 +559,7 @@ def sauver():
         "deserts": ETAT.get("deserts", []),
         "rivieres": ETAT.get("rivieres", []),
         "lacs": ETAT.get("lacs", []),
+        "secousses": ETAT.get("secousses", []),
     }
     return json.dumps(d)
 
@@ -566,6 +581,7 @@ def charger_texte(texte):
     ETAT["deserts"] = extras.get("deserts", [])
     ETAT["rivieres"] = extras.get("rivieres", [])
     ETAT["lacs"] = extras.get("lacs", [])
+    ETAT["secousses"] = extras.get("secousses", [])
     actuelle = set(ETAT["sim"].monde.cases_terre())
     if ETAT["sim"].monde.largeur == 720:
         ETAT["carte"] = "terre"
