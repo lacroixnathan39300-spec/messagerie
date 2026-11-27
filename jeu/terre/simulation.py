@@ -435,20 +435,32 @@ class Simulation:
                 cible.ajouter_souvenir(f"a appris {nom}", 1.0)
 
     def _groupes(self):
-        """Ensembles de personnes vivantes reliées par une proximité (chaîne de voisins)."""
-        restantes = {p.identifiant: p for p in self.vivantes()}
+        """Ensembles de personnes vivantes reliées par une proximité (chaîne de voisins).
+        Les personnes sont rangées par cases de la taille de la vision : on ne compare
+        chacune qu'à ses voisines de cases, au lieu de toutes les autres."""
+        vivantes = self.vivantes()
+        ordre = {p.identifiant: k for k, p in enumerate(vivantes)}
+        restantes = {p.identifiant: p for p in vivantes}
+        grille = {}
+        for p in vivantes:
+            grille.setdefault((p.case[0] // RAYON_VISION, p.case[1] // RAYON_VISION), []).append(p.identifiant)
         groupes = []
         while restantes:
             _, depart = restantes.popitem()
             groupe, a_voir = [depart], [depart]
             while a_voir:
                 courant = a_voir.pop()
-                proches = [q for q in restantes.values()
-                           if self._distance(courant.case, q.case) <= RAYON_VISION]
-                for q in proches:
-                    del restantes[q.identifiant]
-                    groupe.append(q)
-                    a_voir.append(q)
+                bx, by = courant.case[0] // RAYON_VISION, courant.case[1] // RAYON_VISION
+                candidats = [ident for dx in (-1, 0, 1) for dy in (-1, 0, 1)
+                             for ident in grille.get((bx + dx, by + dy), ()) if ident in restantes]
+                # Même ordre que l'ancienne recherche, pour garder les mêmes groupes et leur ordre.
+                candidats.sort(key=lambda ident: ordre[ident])
+                for ident in candidats:
+                    q = restantes[ident]
+                    if self._distance(courant.case, q.case) <= RAYON_VISION:
+                        del restantes[ident]
+                        groupe.append(q)
+                        a_voir.append(q)
             groupes.append(groupe)
         return groupes
 

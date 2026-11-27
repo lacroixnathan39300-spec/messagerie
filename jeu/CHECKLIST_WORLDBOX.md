@@ -58,4 +58,4 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 ## Technique
 - ✅ Fonctionne hors connexion sur téléphone (APK)
 - ❌ Mises à jour de l'APK sans perdre la partie (clé de signature stable)
-- 🟡 Performances sur téléphone ancien : mesuré sur ordinateur (environ 2,3 ms de calcul par jour avec 30 personnes) ; pas encore testé sur un vrai téléphone ancien
+- 🟡 Performances sur téléphone ancien : mesuré sur ordinateur (environ 25 ms de calcul par jour avec 430 personnes, après optimisation des groupes de personnes) ; pas encore testé sur un vrai téléphone ancien
