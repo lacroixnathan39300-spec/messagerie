@@ -10,7 +10,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Taille du pinceau réglable (petit / moyen / grand)
 - ✅ Panneau d'infos sur une personne : âge, couple, enfants, langue, savoirs, soif, faim, foi
 - ✅ Sauvegardes multiples (trois emplacements)
-- 🟡 Menu de réglages : seul l'affichage des villes peut être coupé ; langue et sons à faire
+- 🟡 Menu de réglages : on peut couper l'affichage des villes et le son des actions ; choix de langue pas encore prévu (l'application est en français)
 
 ## Terrain
 - ✅ Terre ajoutée sur la mer
@@ -23,7 +23,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - 🟡 Désert naturel : déserts placés approximativement dans les zones subtropicales (sans données climatiques)
 - 🟡 Rivières et lacs : rivières qui descendent des montagnes jusqu'à la mer, lacs dans les cuvettes (tracé approximatif, calculé à partir de l'altitude)
 - ✅ Personnages en pixels quand on zoome : humains, moutons, loups, poissons, dragons et zombies sont dessinés comme de petits sprites
-- ❌ Affichage net de la terre ajoutée à petit zoom
+- ✅ Affichage net de la terre ajoutée à petit zoom (vérifié : la terre peinte reste visible à l'échelle de la carte entière)
 
 ## Êtres
 - 🟡 Personnes (naissance, mort, faim, soif, prières)

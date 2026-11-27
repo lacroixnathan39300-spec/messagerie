@@ -321,10 +321,26 @@ function message(texte) {
   delaiMessage = setTimeout(() => { $("message").textContent = ""; }, 3000);
 }
 
+// Petit bip d'action, joué seulement si le réglage « son » est coché.
+let contexteAudio = null;
+function bip(frequence = 660, duree = 0.06) {
+  if (!$("reglage-son").checked) return;
+  try {
+    contexteAudio = contexteAudio || new (window.AudioContext || window.webkitAudioContext)();
+    const osc = contexteAudio.createOscillator(), gain = contexteAudio.createGain();
+    osc.frequency.value = frequence;
+    gain.gain.value = 0.05;
+    osc.connect(gain).connect(contexteAudio.destination);
+    osc.start();
+    osc.stop(contexteAudio.currentTime + duree);
+  } catch (e) { /* pas de son disponible : on ignore */ }
+}
+
 function agir(i, j) {
   const r = appeler(`moteur.agir('${$("outil").value}', ${i}, ${j}, ${$("taille").value})`);
   etat = r.etat;
   message(r.message);
+  if (r.message && !/Il faut|déjà|C'est la mer/.test(r.message)) bip(520 + Math.random() * 200);
   rendre();
 }
 
