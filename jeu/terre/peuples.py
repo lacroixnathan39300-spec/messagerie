@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field
 
 TAILLE_PEUPLE = 5  # nombre minimal de personnes pour former un peuple
-SEUIL_GUERRE = 1.2  # somme des colères moyennes de deux peuples au-delà de laquelle ils se battent
+SEUIL_GUERRE = 0.8  # somme des colères moyennes de deux peuples au-delà de laquelle ils se battent
 
 
 @dataclass

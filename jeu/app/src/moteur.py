@@ -7,7 +7,7 @@ import math
 import random
 
 from terre import economie, histoire, sauvegarde, zoom
-from terre.personne import Personne
+from terre.personne import AGE_ADULTE, Personne
 from terre.priere import TEXTES
 from terre.monde import NOURRITURE_MAX, creer_archipel, creer_ile
 from terre.ressources import charger_population
@@ -34,6 +34,8 @@ def nouvelle_partie(graine=1, carte="terre"):
         ETAT["carte"] = "terre"
     cotes = sorted(monde.points_eau)
     personnes = [Personne(i, *rng.choice(cotes)) for i in range(NB_PERSONNES_DEPART)]
+    for p in personnes:  # le monde commence avec des adultes : sinon rien ne se passe avant 15 ans
+        p.age = rng.randint(AGE_ADULTE, 45 * 365)
     ETAT["sim"] = Simulation(monde, personnes, graine)
     _reinitialiser_fleaux()
     if ETAT["carte"] == "terre":

@@ -22,6 +22,7 @@ PROBA_PRIERE = 0.05  # chance par tour de formuler une prière, multipliée par 
 COOLDOWN_PRIERE = 40  # tours minimum entre deux prières d'une même personne
 SEUIL_SCHISME = 3  # nombre de personnes en colère, proches, qui se séparent
 COLERE_SCHISME = 0.6
+COLERE_FAIM = 0.02  # colère gagnée par jour quand on a faim
 FOI_MIN_PRIERE = 0.1
 RAYON_VISION = 6
 PERTE_FAIM = 0.5
@@ -29,7 +30,7 @@ PERTE_ENERGIE = 0.3
 REPOS = 1.0
 REPAS = 30.0
 ENERGIE_MAX = 100.0
-PROBA_NAISSANCE = 0.002
+PROBA_NAISSANCE = 0.006
 PROBA_DEFORMATION = 0.2
 FACTEUR_FIABILITE = 0.9
 FIABILITE_MIN = 0.2
@@ -75,6 +76,8 @@ class Simulation:
             if self._eau_active() and p.soif >= SEUIL_SOIF:
                 p.longevite -= USURE_FAIM_SOIF
             p.faim += PERTE_FAIM
+            if p.faim >= SEUIL_FAIM:  # la faim rend colérique : c'est ce qui peut déclencher une guerre
+                p.colere = min(1.0, p.colere + COLERE_FAIM)
             if self._eau_active():
                 p.soif += PERTE_SOIF
             p.oublier()

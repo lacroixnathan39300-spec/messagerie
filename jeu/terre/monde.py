@@ -35,7 +35,7 @@ class Monde:
             if (x + dx, y + dy) in self._terre:
                 yield (x + dx, y + dy)
 
-    def repousser(self, taux=0.02):
+    def repousser(self, taux=0.05):
         """Chaque buisson regagne un peu de nourriture à chaque tour."""
         for case, quantite in self.nourriture.items():
             if quantite < NOURRITURE_MAX:

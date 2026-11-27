@@ -13,7 +13,7 @@ from .monde import NOURRITURE_MAX, Monde
 
 CHEMIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "donnees", "terre_0_5deg.txt")
 MONTAGNE = 6  # classe à partir de laquelle la case est considérée comme montagneuse
-PROBA_BUISSON_TERRE = 0.01
+PROBA_BUISSON_TERRE = 0.03
 
 
 def charger(chemin=CHEMIN, buissons=True):
