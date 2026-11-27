@@ -111,7 +111,17 @@ function rendre() {
   afficherChronique();
 }
 
+// Les bords de la carte : on ne peut pas glisser au-delà, sauf si l'option « bords ouverts » est cochée.
+function bornerVue() {
+  const canvas = $("carte");
+  const largeur = LARGEUR_TERRE * zoomCarte, hauteur = HAUTEUR_TERRE * zoomCarte;
+  if ($("reglage-bords").checked) return;
+  decalage.x = largeur <= canvas.width ? (canvas.width - largeur) / 2 : Math.min(0, Math.max(canvas.width - largeur, decalage.x));
+  decalage.y = hauteur <= canvas.height ? (canvas.height - hauteur) / 2 : Math.min(0, Math.max(canvas.height - hauteur, decalage.y));
+}
+
 function dessinerCarte() {
+  bornerVue();
   const canvas = $("carte");
   const ctx = canvas.getContext("2d");
   const s = zoomCarte;
