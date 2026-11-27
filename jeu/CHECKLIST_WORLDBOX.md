@@ -34,9 +34,9 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 ## Civilisation
 - 🟡 Peuples, guerres, échanges, schismes (calculés, mais peu visibles sur la carte)
 - ✅ Villes du monde réel (243 points, noms en zoom) et villages fondés par les peuples (marqueurs)
-- 🟡 Bâtiments : les villages grandissent d'une maison tous les 30 jours (jusqu'à 8)
+- 🟡 Bâtiments : les villages grandissent d'une maison tous les 30 jours (jusqu'à 8), dessinés en maisons à petit détail quand on zoome
 - ✅ Routes : deux villages proches et peuplés sont reliés par une route sur la terre
-- 🟡 Véhicules : des véhicules roulent sur les routes entre villages ; vue zoomée des bâtiments et véhicules à faire
+- ✅ Véhicules : des voitures roulent sur les routes entre villages, dessinées en petites voitures quand on zoome
 
 ## Pouvoirs et catastrophes
 - ✅ Personne (ajout)

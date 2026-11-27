@@ -152,6 +152,7 @@ function dessinerCarte() {
   }
   ctx.fillStyle = "#facc15";
   for (const [x, y] of etat.vehicules) {
+    if (zoomCarte >= 3) { dessinerSprite(ctx, "voiture", x, y, s, null, 0.6); continue; }
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(2, s * 0.9), Math.max(2, s * 0.9));
   }
   ctx.strokeStyle = "rgba(220,38,38,0.9)"; ctx.lineWidth = Math.max(1.5, s * 0.5); ctx.setLineDash([s * 2, s]);
@@ -169,6 +170,13 @@ function dessinerCarte() {
   }
   const POSITIONS_MAISONS = [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, 2], [-2, 2], [2, -2]];
   for (const [x, y, maisons] of etat.villages) {
+    if (zoomCarte >= 3) {
+      dessinerSprite(ctx, "maison", x, y, s, null, 0.8);
+      for (const [dx, dy] of POSITIONS_MAISONS.slice(0, maisons - 1)) {
+        dessinerSprite(ctx, "maison", x + dx, y + dy, s, null, 0.6);
+      }
+      continue;
+    }
     const cx = decalage.x + x * s, cy = decalage.y + y * s, taille = Math.max(3, s * 2);
     ctx.fillStyle = "#92400e";
     ctx.fillRect(cx - taille / 2, cy - taille / 2, taille, taille);
@@ -207,6 +215,8 @@ const PALETTES = {
   dragon: { r: "#dc2626", k: "#450a0a", y: "#facc15" },
   zombie: { g: "#65a30d", k: "#1a2e05" },
   poisson: { b: "#38bdf8", k: "#0c4a6e" },
+  maison: { r: "#b91c1c", m: "#d6b88a", k: "#292524", y: "#fde68a" },
+  voiture: { y: "#facc15", k: "#1c1917", w: "#bae6fd" },
 };
 const SPRITES = {
   humain: ["..cccc..", "..cccc..", ".bbbbbb.", "bbbbbbbb", ".bbbbbb.", ".bbbbbb.", ".bb..bb.", ".kk..kk."],
@@ -215,13 +225,15 @@ const SPRITES = {
   dragon: ["kk....kk", "krk..krk", "krrrrrrk", ".krrrrk.", "kryrrryk", ".rrrrrr.", "..r..r..", "..k..k.."],
   zombie: ["..gggg..", ".gkggkg.", "..gggg..", "gggggggg", "..gggg..", "..gggg..", "..g..g..", "..k..k.."],
   poisson: ["........", "...bbb..", ".bbbbbb.", "bbbbbbbb", ".bbbbbb.", "..bbb...", "........", "........"],
+  maison: ["...rr...", "..rrrr..", ".rrrrrr.", "rrrrrrrr", "mmmmmmmm", "myymmkmm", "mmmmmkmm", "mmmmmkmm"],
+  voiture: ["........", "..kkkk..", ".kwwwwk.", "yyyyyyyy", "yyyyyyyy", "kkk..kkk", "........", "........"],
 };
-function dessinerSprite(ctx, espece, x, y, s, corps) {
+function dessinerSprite(ctx, espece, x, y, s, corps, echelle = 1) {
   const grille = SPRITES[espece];
   if (!grille) return;
   const pal = { ...PALETTES[espece] };
   if (corps) pal.b = corps;
-  const q = s / 3;                        // taille d'un pixel du personnage
+  const q = (s / 3) * echelle;            // taille d'un pixel du personnage
   const cx = decalage.x + x * s + s / 2;
   const cy = decalage.y + y * s + s / 2;
   const gauche = cx - 4 * q, haut = cy - 6 * q;
