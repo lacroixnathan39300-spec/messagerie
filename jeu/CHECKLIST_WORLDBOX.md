@@ -48,7 +48,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Tornade (se déplace chaque jour et tue ce qu'elle traverse)
 - ✅ Météorite (tue dans une zone large et creuse un cratère de mer)
 - ✅ Peste (se transmet entre voisins et tue chaque jour une partie des malades)
-- ❌ Bombes et armes
+- 🟡 Bombes : une explosion tue les personnes proches et enflamme la terre ; pas encore d'armes à proprement parler
 
 ## Monde
 - ✅ Carte réelle de la Terre (1 case = environ 55 km)

@@ -361,6 +361,17 @@ def agir(outil, i, j, rayon=2):
         dx, dy = round(math.cos(angle)), round(math.sin(angle))
         ETAT.setdefault("tornades", []).append([i, j, dx, dy, 15])
         message = "Une tornade se forme et part en tournoyant."
+    elif outil == "bombe":
+        # Une explosion : tout ce qui se trouve dans le rayon meurt, et la terre prend feu.
+        touches = [p for p in sim.vivantes()
+                   if (p.x - i) ** 2 + (p.y - j) ** 2 <= (rayon + 1) ** 2]
+        for p in touches:
+            sim._mourir(p, "bombe")
+        for dx in range(-rayon - 1, rayon + 2):
+            for dy in range(-rayon - 1, rayon + 2):
+                if dx * dx + dy * dy <= (rayon + 1) ** 2 and sim.monde.est_terre(i + dx, j + dy):
+                    ETAT.setdefault("feux", {})[(i + dx, j + dy)] = DUREE_FEU
+        message = f"Une bombe explose : {len(touches)} morts, le feu gagne la zone."
     elif outil == "meteorite":
         touches = [p for p in sim.vivantes()
                    if abs(p.x - i) <= rayon * 2 and abs(p.y - j) <= rayon * 2]
