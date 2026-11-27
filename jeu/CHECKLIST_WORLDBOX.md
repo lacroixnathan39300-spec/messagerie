@@ -16,7 +16,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Terre ajoutée sur la mer
 - ✅ Mer qui submerge la terre (noie les personnes)
 - ✅ Montagnes (pinceau, visibles et sauvegardées ; l'effet sur la vie n'est pas encore simulé)
-- 🟡 Forêts : zones denses de buissons teintées en vert foncé
+- 🟡 Forêts : zones tropicales et boréales couvertes de forêt (approximatif, sans données de végétation) ; les zones de buissons serrés restent teintées en vert foncé
 - ✅ Neige sur les plus hauts sommets de la Terre réelle (altitude)
 - ✅ Lave : pinceau qui pose des cases mortelles, qui refroidissent après 40 jours
 - ✅ Désert : pinceau qui retire les buissons (aucun n'y pousse)

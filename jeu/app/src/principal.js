@@ -124,6 +124,11 @@ function dessinerCarte() {
     ctx.fillStyle = terre ? "rgb(120,160,80)" : "rgb(150,190,220)";
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.ceil(s), Math.ceil(s));
   }
+  // Forêts approximatives (zones tropicales et boréales), dessinées par case.
+  ctx.fillStyle = "rgba(20,70,30,0.4)";
+  for (const [x, y] of etat.forets) {
+    ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s), Math.max(1, s));
+  }
   // Forêt : les endroits où les buissons sont serrés (au moins 4 buissons dans un rayon de 2 cases).
   const buissons = new Set(etat.buissons.map(([x, y]) => x + "," + y));
   ctx.fillStyle = "rgba(20,70,30,0.55)";

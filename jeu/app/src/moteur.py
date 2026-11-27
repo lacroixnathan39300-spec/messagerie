@@ -38,6 +38,7 @@ def nouvelle_partie(graine=1, carte="terre"):
     _reinitialiser_fleaux()
     if ETAT["carte"] == "terre":
         ETAT["deserts"] = _deserts_naturels(monde)
+    ETAT["forets"] = _forets_naturels(monde, rng) if carte == "terre" else []
     ETAT["rivieres"], ETAT["lacs"] = _rivieres(monde, rng) if getattr(monde, "altitude", None) else ([], [])
     ETAT["population"] = charger_population()
     return etat()
@@ -72,6 +73,21 @@ def _rivieres(monde, rng, nb_sources=250, pas_max=600):
                 vues.add(k)
                 rivieres.append([k[0], k[1]])
     return rivieres, lacs
+
+
+def _forets_naturels(monde, rng):
+    """Forêts approximatives : la forêt tropicale (près de l'équateur) et la forêt boréale (nord).
+    Pas de données de végétation : une case sur deux de ces zones basses est couverte de forêt."""
+    deserts = {tuple(c) for c in ETAT.get("deserts", [])}
+    res = []
+    for (x, y) in sorted(monde.cases_terre()):
+        if (x, y) in deserts or monde.altitude.get((x, y), 0) > 5:
+            continue
+        lat = 90 - (y + 0.5) * 0.5
+        if abs(lat) <= 10 or 50 <= lat <= 68:
+            if rng.random() < 0.5:
+                res.append([x, y])
+    return res
 
 
 def _deserts_naturels(monde):
@@ -130,6 +146,7 @@ def _reinitialiser_fleaux():
     ETAT["rivieres"] = []   # [x, y] : cases d'eau courante, qui descendent des montagnes vers la mer
     ETAT["lacs"] = []       # [x, y] : cases d'eau stagnante, là où une rivière ne peut plus descendre
     ETAT["secousses"] = []  # [x, y, rayon, jours] : répliques d'un séisme
+    ETAT["forets"] = []     # [x, y] : cases couvertes de forêt
     ETAT["jour_village"] = 0
 
 
@@ -521,6 +538,7 @@ def etat():
         "guerres": [list(g) for g in ETAT.get("guerres", [])],
         "laves": [list(c) for c in ETAT.get("laves", [])],
         "deserts": [list(c) for c in ETAT.get("deserts", [])],
+        "forets": [list(c) for c in ETAT.get("forets", [])],
         "rivieres": [list(c) for c in ETAT.get("rivieres", [])],
         "lacs": [list(c) for c in ETAT.get("lacs", [])],
         "largeur": sim.monde.largeur,
@@ -566,6 +584,7 @@ def sauver():
         "rivieres": ETAT.get("rivieres", []),
         "lacs": ETAT.get("lacs", []),
         "secousses": ETAT.get("secousses", []),
+        "forets": [list(c) for c in ETAT.get("forets", [])],
     }
     return json.dumps(d)
 
@@ -588,6 +607,7 @@ def charger_texte(texte):
     ETAT["rivieres"] = extras.get("rivieres", [])
     ETAT["lacs"] = extras.get("lacs", [])
     ETAT["secousses"] = extras.get("secousses", [])
+    ETAT["forets"] = extras.get("forets", [])
     actuelle = set(ETAT["sim"].monde.cases_terre())
     if ETAT["sim"].monde.largeur == 720:
         ETAT["carte"] = "terre"
