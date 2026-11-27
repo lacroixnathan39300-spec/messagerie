@@ -55,6 +55,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Changer de carte : île ou archipel générés selon la graine (menu « Nouvelle partie »)
 - ✅ Rendu façon bac à sable : couleurs vives, pinceau en cercle au survol, barre d'outils arrondie, déserts et forêts aux bords plus doux (dessins et règles propres au projet)
 - ✅ Zoom centré sur le doigt ou le curseur, carte qui occupe toute la largeur
+- ✅ Échelle réelle : zoom « 1 px = 1 km » (une case = 55,6 km), avec l'affichage de l'échelle ; personnes et animaux en symboles de taille fixe
 - ❌ Partager une carte avec d'autres joueurs
 
 ## Technique

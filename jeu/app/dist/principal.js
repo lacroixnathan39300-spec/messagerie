@@ -122,6 +122,8 @@ function bornerVue() {
 
 function dessinerCarte() {
   bornerVue();
+  const km = KM_PAR_CASE / zoomCarte;   // km représentés par un pixel de l'écran
+  $("echelle").textContent = km >= 10 ? `1 px ≈ ${Math.round(km)} km` : `1 px ≈ ${km.toFixed(1)} km`;
   const canvas = $("carte");
   const ctx = canvas.getContext("2d");
   const s = zoomCarte;
@@ -218,7 +220,7 @@ function dessinerCarte() {
   for (const [x, y, espece] of etat.animaux) {
     if (zoomCarte >= SEUIL_SPRITES) { dessinerSprite(ctx, espece, x, y, s); continue; }
     ctx.fillStyle = {loup: "#6b7280", poisson: "#38bdf8", dragon: "#dc2626", zombie: "#65a30d"}[espece] || "#f5f5f4";
-    ctx.beginPath(); ctx.arc(decalage.x + x * s, decalage.y + y * s, Math.max(2, s * 1.2), 0, 2 * Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(decalage.x + (x + 0.5) * s, decalage.y + (y + 0.5) * s, 3 * (window.devicePixelRatio || 1), 0, 2 * Math.PI); ctx.fill();
     ctx.strokeStyle = "#111827"; ctx.lineWidth = 1; ctx.stroke();   // contour sombre : lisible sur toutes les couleurs
   }
   for (const p of etat.personnes) {
@@ -230,7 +232,7 @@ function dessinerCarte() {
     const couleur = couleurPersonne(p);
     if (zoomCarte >= SEUIL_SPRITES) { dessinerSprite(ctx, "humain", p.x, p.y, s, couleur); continue; }
     ctx.fillStyle = couleur;
-    ctx.beginPath(); ctx.arc(cx, cy, Math.max(2.5, s * 1.5), 0, 2 * Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 3.5 * (window.devicePixelRatio || 1), 0, 2 * Math.PI); ctx.fill();
     ctx.strokeStyle = "#111827"; ctx.lineWidth = 1; ctx.stroke();
   }
   // Cercle du pinceau, au survol du curseur ou sous le doigt.
@@ -245,7 +247,9 @@ function dessinerCarte() {
 
 // Petits personnages en pixels, dessinés quand on zoome assez pour qu'un pixel reste visible.
 // Une grille de 8 x 8 par espèce ; un personnage fait environ une case de large.
-const SEUIL_SPRITES = 8;
+const SEUIL_SPRITES = 0;   // les êtres sont toujours dessinés en symboles de taille fixe
+// Échelle : une case de la grille fait environ 55,6 km ; à ce zoom, 1 pixel représente 1 km.
+const KM_PAR_CASE = 55.6, ZOOM_REEL = KM_PAR_CASE, ZOOM_MIN = 0.5, ZOOM_MAX = 120;
 // Chaque peuple a sa couleur ; les schismatiques sont en rouge, les personnes sans peuple en gris.
 const COULEURS_PEUPLES = ["#2563eb", "#16a34a", "#ca8a04", "#9333ea", "#0891b2", "#db2777", "#65a30d", "#ea580c"];
 function couleurPersonne(p) {
@@ -278,7 +282,7 @@ function dessinerSprite(ctx, espece, x, y, s, corps, echelle = 1) {
   if (!grille) return;
   const pal = { ...PALETTES[espece] };
   if (corps) pal.b = corps;
-  const q = (s / 8) * echelle;            // un personnage fait environ une case de large
+  const q = echelle * 1.6 * (window.devicePixelRatio || 1);   // symbole de taille fixe, quel que soit le zoom
   const cx = decalage.x + x * s + s / 2;
   const cy = decalage.y + y * s + s / 2;
   const gauche = cx - 4 * q, haut = cy - 6 * q;
@@ -402,6 +406,7 @@ function lier() {
   $("lecture").onclick = () => { enCours = !enCours; rendre(); };
   // Les boutons zooment autour du centre de l'écran.
   const centreEcran = () => ({ x: $("carte").width / 2, y: $("carte").height / 2 });
+  $("echelle-reelle").onclick = () => { const c = centreEcran(); zoomAutour(ZOOM_REEL / zoomCarte, c.x, c.y); };
   $("zoom+").onclick = () => { const c = centreEcran(); zoomAutour(1.4, c.x, c.y); };
   $("zoom-").onclick = () => { const c = centreEcran(); zoomAutour(1 / 1.4, c.x, c.y); };
   $("sauver").onclick = () => { localStorage.setItem(cle(), py.runPython("moteur.sauver()")); message("Partie sauvegardée sur ce téléphone."); };
@@ -486,7 +491,7 @@ function caseSous(e) {
 
 // Zoom autour d'un point de l'écran (en pixels du canevas) : ce point reste sous le doigt ou le curseur.
 function zoomAutour(facteur, x, y) {
-  const nouveau = Math.min(40, Math.max(0.5, zoomCarte * facteur));
+  const nouveau = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoomCarte * facteur));
   const k = nouveau / zoomCarte;
   decalage = { x: x - (x - decalage.x) * k, y: y - (y - decalage.y) * k };
   zoomCarte = nouveau;
