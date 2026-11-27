@@ -18,7 +18,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Montagnes (pinceau, visibles et sauvegardées ; l'effet sur la vie n'est pas encore simulé)
 - 🟡 Forêts : zones denses de buissons teintées en vert foncé
 - ✅ Neige sur les plus hauts sommets de la Terre réelle (altitude)
-- 🟡 Lave : pinceau qui pose des cases mortelles (elles ne refroidissent pas encore)
+- ✅ Lave : pinceau qui pose des cases mortelles, qui refroidissent après 40 jours
 - ✅ Désert : pinceau qui retire les buissons (aucun n'y pousse)
 - ❌ Rivières et lacs
 - ❌ Affichage net de la terre ajoutée à petit zoom

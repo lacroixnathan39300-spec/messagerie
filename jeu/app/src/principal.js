@@ -39,7 +39,7 @@ async function demarrer() {
   } else {
     etat = appeler("moteur.nouvelle_partie(1)");
   }
-  window.terreVivante = { etat: () => etat };  // pour les tests automatiques
+  window.terreVivante = { etat: () => etat, avancerJours: (n) => { etat = appeler(`moteur.avancer(${n})`); return etat; } };  // pour les tests automatiques
   $("pret").style.display = "none";
   $("jeu").style.display = "block";
   ajusterCarte();

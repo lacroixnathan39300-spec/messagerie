@@ -77,11 +77,12 @@ def _reinitialiser_fleaux():
     ETAT["routes"] = []   # [x, y] : cases de route entre villages
     ETAT["vehicules"] = []  # [x, y] : véhicules qui roulent sur les routes
     ETAT["guerres"] = []    # [x1, y1, x2, y2] : peuples en guerre qui se touchent
-    ETAT["laves"] = []      # [x, y] : cases de lave, mortelles
+    ETAT["laves"] = []      # [x, y, jours] : cases de lave, mortelles, refroidies après DUREE_LAVE
     ETAT["deserts"] = []    # [x, y] : cases de désert, sans buissons
     ETAT["jour_village"] = 0
 
 
+DUREE_LAVE = 40        # jours avant qu'une case de lave refroidisse
 INTERVALLE_VILLAGE = 30  # un peuple fonde un village tous les 30 jours au plus
 MAISONS_MAX = 8
 
@@ -176,7 +177,17 @@ def _propager(sim):
         if voisins:
             v[0], v[1] = random.choice(voisins)
 
-    laves = {tuple(c) for c in ETAT.get("laves", [])}
+    # La lave refroidit : chaque case vieillit d'un jour et redevient terre ordinaire.
+    refroidies = []
+    for c in ETAT.get("laves", []):
+        if len(c) < 3:
+            c.append(0)
+        c[2] += 1
+        if c[2] >= DUREE_LAVE:
+            refroidies.append(c)
+    for c in refroidies:
+        ETAT["laves"].remove(c)
+    laves = {(c[0], c[1]) for c in ETAT.get("laves", [])}
     for p in sim.vivantes():
         if (p.x, p.y) in laves:
             sim._mourir(p, "lave")
@@ -303,12 +314,12 @@ def agir(outil, i, j, rayon=2):
     elif outil == "lave":
         posees = 0
         laves = ETAT.setdefault("laves", [])
-        deja = {tuple(c) for c in laves}
+        deja = {(c[0], c[1]) for c in laves}
         for dx in range(-rayon, rayon + 1):
             for dy in range(-rayon, rayon + 1):
                 c = (i + dx, j + dy)
                 if dx * dx + dy * dy <= rayon * rayon and sim.monde.est_terre(*c) and c not in deja:
-                    laves.append([c[0], c[1]])
+                    laves.append([c[0], c[1], 0])
                     deja.add(c)
                     posees += 1
         message = f"La lave jaillit ({posees} cases)." if posees else "Il faut de la terre pour la lave."
