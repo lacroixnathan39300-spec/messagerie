@@ -27,7 +27,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 ## Êtres
 - 🟡 Personnes (naissance, mort, faim, soif, prières)
 - ✅ Animaux : moutons et loups marchent sur la terre (le loup mange le mouton), poissons nagent dans la mer ; sauvegardés
-- ❌ Créatures spéciales (dragons, zombies…)
+- 🟡 Créatures spéciales : dragon (vole partout et brûle la terre) et zombie (tue les personnes voisines) ; d'autres à venir
 - 🟡 Rencontres entre peuples : une ligne rouge relie deux peuples en guerre et proches (code testé, guerre pas encore observée)
 
 ## Civilisation

@@ -177,8 +177,12 @@ function dessinerCarte() {
       ctx.fillRect(cx + dx * s - taille / 4, cy + dy * s - taille / 4, taille / 2, taille / 2);
     }
   }
+  ctx.fillStyle = "#f97316";
+  for (const [x, y] of etat.feux) {
+    ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s), Math.max(1, s));
+  }
   for (const [x, y, espece] of etat.animaux) {
-    ctx.fillStyle = espece === "loup" ? "#6b7280" : espece === "poisson" ? "#38bdf8" : "#f5f5f4";
+    ctx.fillStyle = {loup: "#6b7280", poisson: "#38bdf8", dragon: "#dc2626", zombie: "#65a30d"}[espece] || "#f5f5f4";
     ctx.beginPath(); ctx.arc(decalage.x + x * s, decalage.y + y * s, Math.max(2, s * 1.2), 0, 2 * Math.PI); ctx.fill();
   }
   for (const p of etat.personnes) {

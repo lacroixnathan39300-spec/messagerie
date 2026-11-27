@@ -88,7 +88,7 @@ def _reinitialiser_fleaux():
     ETAT["feux"] = {}      # case (x, y) -> jours restants de feu
     ETAT["peste"] = set()  # identifiants des personnes malades
     ETAT["tornades"] = []  # [x, y, dx, dy, jours restants]
-    ETAT["animaux"] = []   # [x, y, espèce] : "mouton" ou "loup"
+    ETAT["animaux"] = []   # [x, y, espèce] : mouton, loup, poisson, dragon, zombie
     ETAT["villages"] = []  # [x, y, maisons] : villages fondés par les peuples
     ETAT["routes"] = []   # [x, y] : cases de route entre villages
     ETAT["vehicules"] = []  # [x, y] : véhicules qui roulent sur les routes
@@ -159,6 +159,15 @@ def _reperer_guerres(sim):
     ETAT["guerres"] = lignes
 
 
+def _peut_aller(espece, terre):
+    """Les poissons nagent dans la mer, les moutons, loups et zombies marchent sur la terre, le dragon vole partout."""
+    if espece == "dragon":
+        return True
+    if espece == "poisson":
+        return not terre
+    return terre
+
+
 def _propager(sim):
     """Évolution quotidienne du feu et de la peste."""
     ETAT["jour_village"] = ETAT.get("jour_village", 0) + 1
@@ -212,8 +221,7 @@ def _propager(sim):
     for a in animaux:
         if random.random() < 0.5:
             dx, dy = random.choice(((1, 0), (-1, 0), (0, 1), (0, -1)))
-            # Les poissons nagent dans la mer, les moutons et loups marchent sur la terre.
-            if sim.monde.est_terre(a[0] + dx, a[1] + dy) == (a[2] != "poisson"):
+            if _peut_aller(a[2], sim.monde.est_terre(a[0] + dx, a[1] + dy)):
                 a[0] += dx
                 a[1] += dy
     if any(a[2] == "loup" for a in animaux):
@@ -223,6 +231,15 @@ def _propager(sim):
                 if abs(loup[0] - mouton[0]) <= 1 and abs(loup[1] - mouton[1]) <= 1:
                     moutons_manges.add(id(mouton))
         animaux[:] = [a for a in animaux if id(a) not in moutons_manges]
+    for a in animaux:
+        if a[2] == "dragon":
+            # Le dragon brûle la terre sur laquelle il passe.
+            if sim.monde.est_terre(a[0], a[1]) and random.random() < 0.2:
+                ETAT.setdefault("feux", {})[(a[0], a[1])] = DUREE_FEU
+        elif a[2] == "zombie":
+            for p in sim.vivantes():
+                if abs(p.x - a[0]) <= 1 and abs(p.y - a[1]) <= 1 and random.random() < 0.3:
+                    sim._mourir(p, "zombie")
     tornades = ETAT.setdefault("tornades", [])
     for t in tornades:
         t[0] += t[2]
@@ -320,13 +337,14 @@ def agir(outil, i, j, rayon=2):
                 if dx * dx + dy * dy <= rayon * rayon and sim.monde.est_terre(i + dx, j + dy):
                     sim.monde.poser_terre(i + dx, j + dy, False)
         message = f"Une météorite s'écrase : {len(touches)} morts, un cratère s'ouvre."
-    elif outil in ("mouton", "loup", "poisson"):
+    elif outil in ("mouton", "loup", "poisson", "dragon", "zombie"):
         terre = sim.monde.est_terre(i, j)
-        if terre == (outil != "poisson"):
+        if _peut_aller(outil, terre):
             ETAT.setdefault("animaux", []).append([i, j, outil])
-            message = {"mouton": "Un mouton paît.", "loup": "Un loup rôde.", "poisson": "Un banc de poissons passe."}[outil]
+            message = {"mouton": "Un mouton paît.", "loup": "Un loup rôde.", "poisson": "Un banc de poissons passe.",
+                       "dragon": "Un dragon surgit et déploie ses ailes.", "zombie": "Un zombie titube hors de la tombe."}[outil]
         else:
-            message = "Il faut la terre." if outil != "poisson" else "Il faut la mer."
+            message = "Il faut la mer." if outil == "poisson" else "Il faut la terre."
     elif outil == "lave":
         posees = 0
         laves = ETAT.setdefault("laves", [])
@@ -431,6 +449,7 @@ def etat():
         "modifs": modifs,
         "montagnes": montagnes,
         "animaux": animaux,
+        "feux": [[x, y] for (x, y) in ETAT.get("feux", {})],
         "villages": [list(v) for v in ETAT.get("villages", [])],
         "routes": [list(r) for r in ETAT.get("routes", [])],
         "vehicules": [list(v) for v in ETAT.get("vehicules", [])],
