@@ -152,7 +152,7 @@ function dessinerCarte() {
   }
   ctx.fillStyle = "#facc15";
   for (const [x, y] of etat.vehicules) {
-    if (zoomCarte >= 3) { dessinerSprite(ctx, "voiture", x, y, s, null, 0.6); continue; }
+    if (zoomCarte >= SEUIL_SPRITES) { dessinerSprite(ctx, "voiture", x, y, s, null, 0.7); continue; }
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(2, s * 0.9), Math.max(2, s * 0.9));
   }
   ctx.strokeStyle = "rgba(220,38,38,0.9)"; ctx.lineWidth = Math.max(1.5, s * 0.5); ctx.setLineDash([s * 2, s]);
@@ -170,10 +170,10 @@ function dessinerCarte() {
   }
   const POSITIONS_MAISONS = [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, 2], [-2, 2], [2, -2]];
   for (const [x, y, maisons] of etat.villages) {
-    if (zoomCarte >= 3) {
-      dessinerSprite(ctx, "maison", x, y, s, null, 0.8);
+    if (zoomCarte >= SEUIL_SPRITES) {
+      dessinerSprite(ctx, "maison", x, y, s, null, 1);
       for (const [dx, dy] of POSITIONS_MAISONS.slice(0, maisons - 1)) {
-        dessinerSprite(ctx, "maison", x + dx, y + dy, s, null, 0.6);
+        dessinerSprite(ctx, "maison", x + dx, y + dy, s, null, 0.8);
       }
       continue;
     }
@@ -190,7 +190,7 @@ function dessinerCarte() {
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s), Math.max(1, s));
   }
   for (const [x, y, espece] of etat.animaux) {
-    if (zoomCarte >= 3) { dessinerSprite(ctx, espece, x, y, s); continue; }
+    if (zoomCarte >= SEUIL_SPRITES) { dessinerSprite(ctx, espece, x, y, s); continue; }
     ctx.fillStyle = {loup: "#6b7280", poisson: "#38bdf8", dragon: "#dc2626", zombie: "#65a30d"}[espece] || "#f5f5f4";
     ctx.beginPath(); ctx.arc(decalage.x + x * s, decalage.y + y * s, Math.max(2, s * 1.2), 0, 2 * Math.PI); ctx.fill();
   }
@@ -200,13 +200,15 @@ function dessinerCarte() {
       ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(cx, cy, Math.max(4, s * 2.5), 0, 2 * Math.PI); ctx.stroke();
     }
-    if (zoomCarte >= 3) { dessinerSprite(ctx, "humain", p.x, p.y, s, p.schismatique ? "#b91c1c" : "#1d4ed8"); continue; }
+    if (zoomCarte >= SEUIL_SPRITES) { dessinerSprite(ctx, "humain", p.x, p.y, s, p.schismatique ? "#b91c1c" : "#1d4ed8"); continue; }
     ctx.fillStyle = p.schismatique ? "#b91c1c" : "#1d4ed8";
     ctx.beginPath(); ctx.arc(cx, cy, Math.max(2.5, s * 1.5), 0, 2 * Math.PI); ctx.fill();
   }
 }
 
-// Petits personnages en pixels, dessinés quand on zoome : une grille de 8 x 8 par espèce.
+// Petits personnages en pixels, dessinés quand on zoome assez pour qu'un pixel reste visible.
+// Une grille de 8 x 8 par espèce ; un personnage fait environ une case de large.
+const SEUIL_SPRITES = 8;
 // Lettres : b = corps, c = peau, w = blanc, g = gris ou vert, r = rouge, k = contour sombre, y = jaune.
 const PALETTES = {
   humain: { b: "#1d4ed8", c: "#fcd9b6", k: "#1c1917" },
@@ -233,7 +235,7 @@ function dessinerSprite(ctx, espece, x, y, s, corps, echelle = 1) {
   if (!grille) return;
   const pal = { ...PALETTES[espece] };
   if (corps) pal.b = corps;
-  const q = (s / 3) * echelle;            // taille d'un pixel du personnage
+  const q = (s / 8) * echelle;            // un personnage fait environ une case de large
   const cx = decalage.x + x * s + s / 2;
   const cy = decalage.y + y * s + s / 2;
   const gauche = cx - 4 * q, haut = cy - 6 * q;
