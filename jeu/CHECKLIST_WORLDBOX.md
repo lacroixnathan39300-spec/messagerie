@@ -22,6 +22,7 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 - ✅ Désert : pinceau qui retire les buissons (aucun n'y pousse)
 - 🟡 Désert naturel : déserts placés approximativement dans les zones subtropicales (sans données climatiques)
 - ❌ Rivières et lacs
+- ✅ Personnages en pixels quand on zoome : humains, moutons, loups, poissons, dragons et zombies sont dessinés comme de petits sprites
 - ❌ Affichage net de la terre ajoutée à petit zoom
 
 ## Êtres

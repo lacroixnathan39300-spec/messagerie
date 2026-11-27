@@ -39,7 +39,7 @@ async function demarrer() {
   } else {
     etat = appeler("moteur.nouvelle_partie(1)");
   }
-  window.terreVivante = { etat: () => etat, avancerJours: (n) => { etat = appeler(`moteur.avancer(${n})`); return etat; } };  // pour les tests automatiques
+  window.terreVivante = { etat: () => etat, avancerJours: (n) => { etat = appeler(`moteur.avancer(${n})`); return etat; }, vue: (z, dx, dy) => { zoomCarte = z; decalage = { x: dx, y: dy }; rendre(); } };  // pour les tests automatiques
   $("pret").style.display = "none";
   $("jeu").style.display = "block";
   ajusterCarte();
@@ -182,6 +182,7 @@ function dessinerCarte() {
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s), Math.max(1, s));
   }
   for (const [x, y, espece] of etat.animaux) {
+    if (zoomCarte >= 3) { dessinerSprite(ctx, espece, x, y, s); continue; }
     ctx.fillStyle = {loup: "#6b7280", poisson: "#38bdf8", dragon: "#dc2626", zombie: "#65a30d"}[espece] || "#f5f5f4";
     ctx.beginPath(); ctx.arc(decalage.x + x * s, decalage.y + y * s, Math.max(2, s * 1.2), 0, 2 * Math.PI); ctx.fill();
   }
@@ -191,9 +192,47 @@ function dessinerCarte() {
       ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(cx, cy, Math.max(4, s * 2.5), 0, 2 * Math.PI); ctx.stroke();
     }
+    if (zoomCarte >= 3) { dessinerSprite(ctx, "humain", p.x, p.y, s, p.schismatique ? "#b91c1c" : "#1d4ed8"); continue; }
     ctx.fillStyle = p.schismatique ? "#b91c1c" : "#1d4ed8";
     ctx.beginPath(); ctx.arc(cx, cy, Math.max(2.5, s * 1.5), 0, 2 * Math.PI); ctx.fill();
   }
+}
+
+// Petits personnages en pixels, dessinés quand on zoome : une grille de 8 x 8 par espèce.
+// Lettres : b = corps, c = peau, w = blanc, g = gris ou vert, r = rouge, k = contour sombre, y = jaune.
+const PALETTES = {
+  humain: { b: "#1d4ed8", c: "#fcd9b6", k: "#1c1917" },
+  mouton: { w: "#f5f5f4", k: "#292524" },
+  loup: { g: "#6b7280", w: "#e5e7eb", k: "#1f2937" },
+  dragon: { r: "#dc2626", k: "#450a0a", y: "#facc15" },
+  zombie: { g: "#65a30d", k: "#1a2e05" },
+  poisson: { b: "#38bdf8", k: "#0c4a6e" },
+};
+const SPRITES = {
+  humain: ["..cccc..", "..cccc..", ".bbbbbb.", "bbbbbbbb", ".bbbbbb.", ".bbbbbb.", ".bb..bb.", ".kk..kk."],
+  mouton: ["..wwww..", ".wwwwwww", "wwwwwwww", "wwwwwwww", ".wwwwww.", "k.k..k.k", "........", "........"],
+  loup: ["k.....k.", "kk...kk.", "gggggggg", "gggggggg", "gggggggw", ".gggggg.", ".g.gg.g.", ".k.kk.k."],
+  dragon: ["kk....kk", "krk..krk", "krrrrrrk", ".krrrrk.", "kryrrryk", ".rrrrrr.", "..r..r..", "..k..k.."],
+  zombie: ["..gggg..", ".gkggkg.", "..gggg..", "gggggggg", "..gggg..", "..gggg..", "..g..g..", "..k..k.."],
+  poisson: ["........", "...bbb..", ".bbbbbb.", "bbbbbbbb", ".bbbbbb.", "..bbb...", "........", "........"],
+};
+function dessinerSprite(ctx, espece, x, y, s, corps) {
+  const grille = SPRITES[espece];
+  if (!grille) return;
+  const pal = { ...PALETTES[espece] };
+  if (corps) pal.b = corps;
+  const q = s / 3;                        // taille d'un pixel du personnage
+  const cx = decalage.x + x * s + s / 2;
+  const cy = decalage.y + y * s + s / 2;
+  const gauche = cx - 4 * q, haut = cy - 6 * q;
+  grille.forEach((ligne, r) => {
+    [...ligne].forEach((c, col) => {
+      if (c !== "." && pal[c]) {
+        ctx.fillStyle = pal[c];
+        ctx.fillRect(gauche + col * q, haut + r * q, Math.ceil(q), Math.ceil(q));
+      }
+    });
+  });
 }
 
 function afficherPrieres() {
