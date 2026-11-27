@@ -38,8 +38,40 @@ def nouvelle_partie(graine=1, carte="terre"):
     _reinitialiser_fleaux()
     if ETAT["carte"] == "terre":
         ETAT["deserts"] = _deserts_naturels(monde)
+    ETAT["rivieres"], ETAT["lacs"] = _rivieres(monde, rng) if getattr(monde, "altitude", None) else ([], [])
     ETAT["population"] = charger_population()
     return etat()
+
+
+def _rivieres(monde, rng, nb_sources=250, pas_max=600):
+    """Chaque rivière part d'une case haute et descend, pas à pas, vers la case voisine la plus basse.
+    Elle s'arrête au bord de la mer, ou dans une cuvette : c'est alors un lac."""
+    # Pas de rivières sur le continent glacé (au-delà de 66° sud) : la glace n'y coule pas en rivières.
+    hauts = sorted(c for c, a in monde.altitude.items()
+                   if a >= 6 and monde.est_terre(*c) and 90 - (c[1] + 0.5) * 0.5 > -66)
+    if not hauts:
+        return [], []
+    rivieres, lacs, vues = [], [], set()
+    for depart in rng.sample(hauts, min(nb_sources, len(hauts))):
+        c, chemin = depart, []
+        for _ in range(pas_max):
+            if c in vues:
+                break  # rejoint un cours déjà tracé
+            chemin.append(c)
+            voisins = [(c[0] + dx, c[1] + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))]
+            if any(not monde.est_terre(*v) for v in voisins):
+                break  # la rivière atteint la mer
+            alt = monde.altitude.get(c, 0)
+            descente = [v for v in voisins if monde.altitude.get(v, 0) <= alt and v not in chemin]
+            if not descente:
+                lacs.append([c[0], c[1]])  # cuvette : l'eau s'accumule
+                break
+            c = min(descente, key=lambda v: (monde.altitude.get(v, 0), rng.random()))
+        for k in chemin:
+            if k not in vues:
+                vues.add(k)
+                rivieres.append([k[0], k[1]])
+    return rivieres, lacs
 
 
 def _deserts_naturels(monde):
@@ -95,6 +127,8 @@ def _reinitialiser_fleaux():
     ETAT["guerres"] = []    # [x1, y1, x2, y2] : peuples en guerre qui se touchent
     ETAT["laves"] = []      # [x, y, jours] : cases de lave, mortelles, refroidies après DUREE_LAVE
     ETAT["deserts"] = []    # [x, y] : cases de désert, sans buissons
+    ETAT["rivieres"] = []   # [x, y] : cases d'eau courante, qui descendent des montagnes vers la mer
+    ETAT["lacs"] = []       # [x, y] : cases d'eau stagnante, là où une rivière ne peut plus descendre
     ETAT["jour_village"] = 0
 
 
@@ -456,6 +490,8 @@ def etat():
         "guerres": [list(g) for g in ETAT.get("guerres", [])],
         "laves": [list(c) for c in ETAT.get("laves", [])],
         "deserts": [list(c) for c in ETAT.get("deserts", [])],
+        "rivieres": [list(c) for c in ETAT.get("rivieres", [])],
+        "lacs": [list(c) for c in ETAT.get("lacs", [])],
         "largeur": sim.monde.largeur,
         "hauteur": sim.monde.hauteur,
         "terre": [list(c) for c in sim.monde.cases_terre()] if ETAT.get("carte", "terre") != "terre" else None,
@@ -496,6 +532,8 @@ def sauver():
         "vehicules": ETAT.get("vehicules", []),
         "laves": ETAT.get("laves", []),
         "deserts": ETAT.get("deserts", []),
+        "rivieres": ETAT.get("rivieres", []),
+        "lacs": ETAT.get("lacs", []),
     }
     return json.dumps(d)
 
@@ -515,6 +553,8 @@ def charger_texte(texte):
     ETAT["vehicules"] = extras.get("vehicules", [])
     ETAT["laves"] = extras.get("laves", [])
     ETAT["deserts"] = extras.get("deserts", [])
+    ETAT["rivieres"] = extras.get("rivieres", [])
+    ETAT["lacs"] = extras.get("lacs", [])
     actuelle = set(ETAT["sim"].monde.cases_terre())
     if ETAT["sim"].monde.largeur == 720:
         ETAT["carte"] = "terre"

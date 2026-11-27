@@ -164,6 +164,14 @@ function dessinerCarte() {
   for (const [x, y] of etat.laves) {
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s), Math.max(1, s));
   }
+  ctx.fillStyle = "#3b82f6";
+  for (const [x, y] of etat.lacs) {
+    ctx.fillRect(decalage.x + (x - 1) * s, decalage.y + (y - 1) * s, Math.max(1, s * 3), Math.max(1, s * 3));
+  }
+  ctx.fillStyle = "#60a5fa";
+  for (const [x, y] of etat.rivieres) {
+    ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s), Math.max(1, s));
+  }
   ctx.fillStyle = "rgb(222,184,110)";
   for (const [x, y] of etat.deserts) {
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s), Math.max(1, s));
