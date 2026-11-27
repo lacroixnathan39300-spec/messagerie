@@ -53,6 +53,8 @@ Légende : ✅ fait · 🟡 partiel · ❌ à faire
 ## Monde
 - ✅ Carte réelle de la Terre (1 case = environ 55 km)
 - ✅ Changer de carte : île ou archipel générés selon la graine (menu « Nouvelle partie »)
+- ✅ Rendu façon bac à sable : couleurs vives, pinceau en cercle au survol, barre d'outils arrondie, déserts et forêts aux bords plus doux (dessins et règles propres au projet)
+- ✅ Zoom centré sur le doigt ou le curseur, carte qui occupe toute la largeur
 - ❌ Partager une carte avec d'autres joueurs
 
 ## Technique

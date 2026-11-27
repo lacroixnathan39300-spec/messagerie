@@ -37,7 +37,7 @@ def nouvelle_partie(graine=1, carte="terre"):
     ETAT["sim"] = Simulation(monde, personnes, graine)
     _reinitialiser_fleaux()
     if ETAT["carte"] == "terre":
-        ETAT["deserts"] = _deserts_naturels(monde)
+        ETAT["deserts"] = _deserts_naturels(monde, rng)
     ETAT["forets"] = _forets_naturels(monde, rng) if carte == "terre" else []
     ETAT["rivieres"], ETAT["lacs"] = _rivieres(monde, rng) if getattr(monde, "altitude", None) else ([], [])
     ETAT["population"] = charger_population()
@@ -80,24 +80,38 @@ def _forets_naturels(monde, rng):
     Pas de données de végétation : une case sur deux de ces zones basses est couverte de forêt."""
     deserts = {tuple(c) for c in ETAT.get("deserts", [])}
     res = []
+    bord = _bord_decale(rng)
     for (x, y) in sorted(monde.cases_terre()):
         if (x, y) in deserts or monde.altitude.get((x, y), 0) > 5:
             continue
         lat = 90 - (y + 0.5) * 0.5
-        if abs(lat) <= 10 or 50 <= lat <= 68:
+        lat_effective = abs(lat) - bord[x % len(bord)]
+        if lat_effective <= 10 or 50 <= lat_effective <= 68:
             if rng.random() < 0.5:
                 res.append([x, y])
     return res
 
 
-def _deserts_naturels(monde):
-    """Déserts approximatifs : plaines intérieures des zones subtropicales (18 à 32° de latitude).
+def _bord_decale(rng, largeur=720, amplitude=4.0, lissage=9):
+    """Une limite de latitude qui ondule d'une colonne à l'autre, pour éviter les bandes droites.
+    On lisse la houle sur quelques colonnes pour obtenir des courbes plutôt que des stries."""
+    brut = [rng.uniform(-amplitude, amplitude) for _ in range(largeur)]
+    demi = lissage // 2
+    return [sum(brut[(x + k) % largeur] for k in range(-demi, demi + 1)) / lissage for x in range(largeur)]
+
+
+def _deserts_naturels(monde, rng):
+    """Déserts approximatifs : plaines intérieures des zones subtropicales (environ 18 à 32° de latitude).
     Pas de données climatiques : on se fonde sur la latitude, l'altitude et l'éloignement de la mer."""
     res = []
+    bord = _bord_decale(rng)
     for (x, y) in monde.cases_terre():
         lat = 90 - (y + 0.5) * 0.5
-        if not 18 <= abs(lat) <= 32 or monde.altitude.get((x, y), 0) > 4:
+        lat_effective = abs(lat) - bord[x % len(bord)]
+        if not 18 <= lat_effective <= 32 or monde.altitude.get((x, y), 0) > 4:
             continue
+        if rng.random() < 0.15:
+            continue  # quelques trous, pour que la limite ne soit pas nette
         if all(monde.est_terre(x + dx, y + dy) for dx in range(-2, 3) for dy in range(-2, 3)):
             res.append([x, y])
             monde.nourriture.pop((x, y), None)

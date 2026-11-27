@@ -6,15 +6,15 @@ const CLE_BASE = "terre-vivante-partie";
 const cle = () => CLE_BASE + "-" + $("emplacement").value;
 let LARGEUR_TERRE = 720, HAUTEUR_TERRE = 360;
 const COULEURS_ALTITUDE = [
-  [120,170,90],[135,180,95],[160,185,100],[185,185,110],[195,175,115],
-  [180,150,105],[160,130,95],[140,115,95],[200,195,190],[250,250,250]];
+  [124,204,96],[140,212,100],[168,218,108],[196,214,118],[222,200,120],
+  [200,164,110],[178,140,100],[150,122,98],[210,206,200],[250,250,250]];
 const COULEURS_ZONE = {
   0: [232,232,220], 1: [90,90,95], 2: [210,120,80], 3: [150,150,170], 4: [110,110,130],
   5: [200,220,140], 6: [60,60,60], 7: [240,200,60], 8: [150,120,100] };
-const MER = [150, 190, 220];
+const MER = [74, 163, 223];
 
 let py, etat = null, enCours = true, zoomCarte = 1, decalage = { x: 0, y: 0 };
-let fondTerre = null, dernierClic = null, fondIle = null;
+let fondTerre = null, dernierClic = null, fondIle = null, survol = null;
 
 function appeler(expression) {
   return JSON.parse(py.runPython(`import json, moteur\njson.dumps(${expression})`));
@@ -73,7 +73,7 @@ function construireFond(texte) {
           const ligne = lignes[j + dy];
           return ligne !== undefined && ligne[i + dx] === ".";
         });
-        if (cotiere) [r, g, b] = [214, 196, 142];
+        if (cotiere) [r, g, b] = [240, 213, 140];
       }
       const k = (j * LARGEUR_TERRE + i) * 4;
       img.data[k] = r; img.data[k + 1] = g; img.data[k + 2] = b; img.data[k + 3] = 255;
@@ -120,11 +120,11 @@ function dessinerCarte() {
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(fondCourant(), decalage.x, decalage.y, LARGEUR_TERRE * s, HAUTEUR_TERRE * s);
   for (const [x, y] of etat.montagnes) {
-    ctx.fillStyle = "rgb(120,110,100)";
+    ctx.fillStyle = "rgb(150,140,128)";
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.ceil(s), Math.ceil(s));
   }
   for (const [x, y, terre] of etat.modifs) {
-    ctx.fillStyle = terre ? "rgb(120,160,80)" : "rgb(150,190,220)";
+    ctx.fillStyle = terre ? "rgb(124,204,96)" : "rgb(74,163,223)";
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.ceil(s), Math.ceil(s));
   }
   // Forêts approximatives (zones tropicales et boréales), dessinées par case.
@@ -180,7 +180,7 @@ function dessinerCarte() {
   for (const [x, y] of etat.rivieres) {
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s), Math.max(1, s));
   }
-  ctx.fillStyle = "rgb(222,184,110)";
+  ctx.fillStyle = "rgb(236,200,120)";
   for (const [x, y] of etat.deserts) {
     ctx.fillRect(decalage.x + x * s, decalage.y + y * s, Math.max(1, s), Math.max(1, s));
   }
@@ -220,6 +220,14 @@ function dessinerCarte() {
     if (zoomCarte >= SEUIL_SPRITES) { dessinerSprite(ctx, "humain", p.x, p.y, s, couleur); continue; }
     ctx.fillStyle = couleur;
     ctx.beginPath(); ctx.arc(cx, cy, Math.max(2.5, s * 1.5), 0, 2 * Math.PI); ctx.fill();
+  }
+  // Cercle du pinceau, au survol du curseur ou sous le doigt.
+  if (survol && $("outil").value !== "voir") {
+    const r = Number($("taille").value) + 0.5;
+    ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(decalage.x + (survol.i + 0.5) * s, decalage.y + (survol.j + 0.5) * s, r * s, 0, 2 * Math.PI);
+    ctx.stroke();
   }
 }
 
@@ -315,12 +323,12 @@ function fondCourant() {
     const c = document.createElement("canvas");
     c.width = etat.largeur; c.height = etat.hauteur;
     const ctx = c.getContext("2d");
-    ctx.fillStyle = "rgb(150,190,220)"; ctx.fillRect(0, 0, c.width, c.height);
-    ctx.fillStyle = "rgb(110,150,70)";
+    ctx.fillStyle = "rgb(74,163,223)"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = "rgb(124,204,96)";
     for (const [x, y] of etat.terre) ctx.fillRect(x, y, 1, 1);
     // Plages : les cases de terre qui touchent la mer.
     const terre = new Set(etat.terre.map(([x, y]) => x + "," + y));
-    ctx.fillStyle = "rgb(214,196,142)";
+    ctx.fillStyle = "rgb(240,213,140)";
     for (const [x, y] of etat.terre) {
       if (![[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dy]) => terre.has((x + dx) + "," + (y + dy)))) ctx.fillRect(x, y, 1, 1);
     }
@@ -407,7 +415,8 @@ function lier() {
     glisse = { x: e.clientX, y: e.clientY, dx: decalage.x, dy: decalage.y, moved: false };
   });
   carte.addEventListener("pointermove", (e) => {
-    if (!glisse || doigts.size > 1) return;
+    if (!glisse) { survol = caseSous(e); if (survol) dessinerCarte(); return; }
+    if (doigts.size > 1) return;
     const dx = (e.clientX - glisse.x) * devicePixelRatio, dy = (e.clientY - glisse.y) * devicePixelRatio;
     if (Math.abs(dx) + Math.abs(dy) > 4) glisse.moved = true;
     decalage = { x: glisse.dx + dx, y: glisse.dy + dy };
@@ -454,6 +463,13 @@ function lier() {
     zoomAutour(e.deltaY < 0 ? 1.15 : 1 / 1.15, (e.clientX - rect.left) * devicePixelRatio, (e.clientY - rect.top) * devicePixelRatio);
     dessinerCarte();
   }, { passive: false });
+}
+
+// Case de la carte sous le curseur (ou le doigt).
+function caseSous(e) {
+  const rect = $("carte").getBoundingClientRect();
+  const px = (e.clientX - rect.left) * devicePixelRatio, py_ = (e.clientY - rect.top) * devicePixelRatio;
+  return { i: Math.floor((px - decalage.x) / zoomCarte), j: Math.floor((py_ - decalage.y) / zoomCarte) };
 }
 
 // Zoom autour d'un point de l'écran (en pixels du canevas) : ce point reste sous le doigt ou le curseur.
