@@ -33,7 +33,15 @@ def nouvelle_partie(graine=1, carte="terre"):
         BASE["terre"] = set(monde.cases_terre())
         ETAT["carte"] = "terre"
     cotes = sorted(monde.points_eau)
-    personnes = [Personne(i, *rng.choice(cotes)) for i in range(NB_PERSONNES_DEPART)]
+    # Sur la carte terre, trois petits groupes de départ : assez serrés pour former des peuples.
+    if carte == "terre":
+        ancres = [rng.choice(cotes) for _ in range(3)]
+        terre = set(monde.cases_terre())
+        voisins = [[c for c in terre if abs(c[0] - a[0]) + abs(c[1] - a[1]) <= 2] for a in ancres]
+        personnes = [Personne(i, *rng.choice(voisins[i % 3] or [ancres[i % 3]]))
+                     for i in range(NB_PERSONNES_DEPART)]
+    else:
+        personnes = [Personne(i, *rng.choice(cotes)) for i in range(NB_PERSONNES_DEPART)]
     for p in personnes:  # le monde commence avec des adultes : sinon rien ne se passe avant 15 ans
         p.age = rng.randint(AGE_ADULTE, 45 * 365)
     ETAT["sim"] = Simulation(monde, personnes, graine)
